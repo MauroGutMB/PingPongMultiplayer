@@ -48,7 +48,13 @@ class _WaitingForResponseDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(lobbyControllerProvider, (previous, next) {
-      if (next.outgoingInviteToId == null) {
+      // Must be an edge (was set, now cleared), not just "currently null" —
+      // otherwise any later unrelated state change (e.g. acknowledging the
+      // rejection, or even a player_list update) re-fires this and pops a
+      // second route: since this dialog is already gone by then, that
+      // second pop takes out the lobby screen underneath it, leaving an
+      // empty Navigator stack (a black screen).
+      if (previous?.outgoingInviteToId != null && next.outgoingInviteToId == null) {
         Navigator.of(context).pop();
       }
     });
