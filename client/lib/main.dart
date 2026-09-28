@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme.dart';
-import 'features/lobby/lobby_screen.dart';
+import 'features/connect/connect_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: PingPongApp()));
@@ -18,7 +18,7 @@ class PingPongApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       darkTheme: appTheme,
       theme: appTheme,
-      home: const LobbyScreen(),
+      home: const ConnectScreen(),
     );
   }
 }

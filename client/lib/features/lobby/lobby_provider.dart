@@ -1,14 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config.dart';
 import '../../core/protocol.dart';
 import '../../core/websocket_service.dart';
 
-const _defaultServerUrl = String.fromEnvironment(
-  'SERVER_WS_URL',
-  defaultValue: 'ws://localhost:8080',
+/// Set by the connect screen before the lobby is ever shown — automatic
+/// (gist) or manual URL entry both funnel through here.
+class ServerUrlOverride extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String url) => state = url;
+}
+
+final serverUrlOverrideProvider = NotifierProvider<ServerUrlOverride, String?>(
+  ServerUrlOverride.new,
 );
 
-final serverUrlProvider = Provider<String>((ref) => _defaultServerUrl);
+final serverUrlProvider = Provider<String>((ref) {
+  return ref.watch(serverUrlOverrideProvider) ?? kDefaultServerUrl;
+});
 
 final lobbyTransportProvider = Provider<LobbyTransport>((ref) {
   return WebSocketService(ref.watch(serverUrlProvider));
