@@ -283,6 +283,60 @@ void main() {
     });
 
     test(
+      'the dead-reckoning target stays fresh while authoritative, so a '
+      'handoff to the opponent never dead-reckons from a stale position',
+      () {
+        // Simulate several authoritative ticks moving the ball well away
+        // from wherever ballTarget last happened to be (as if the target
+        // were leftover from a rally several points ago, or the match's
+        // very start default).
+        var state = const GameState(
+          ballX: 0.5,
+          ballY: 0.7,
+          ballVX: 0.0,
+          ballVY: -1.0,
+          ballTargetX: 0.5,
+          ballTargetY: 0.5, // stale on purpose
+        );
+        for (var i = 0; i < 3; i++) {
+          state = advanceGame(
+            state,
+            0.05,
+            random: random,
+            restrictToOwnHalf: true,
+          );
+        }
+        // Still authoritative (hasn't crossed 0.5 yet): the target must have
+        // been kept in lockstep with the real, moving ball position.
+        expect(state.ballY, greaterThan(0.5));
+        expect(state.ballTargetX, state.ballX);
+        expect(state.ballTargetY, state.ballY);
+
+        // One more tick crosses into the opponent's half — authority hands
+        // off. The dead-reckoning base must be exactly where the ball
+        // visually was the instant before, not some older, stale value.
+        final justBeforeHandoff = state;
+        final afterHandoff = advanceGame(
+          state,
+          0.05,
+          random: random,
+          restrictToOwnHalf: true,
+        );
+
+        expect(afterHandoff.ballY, lessThan(0.5)); // now on the opponent half
+        final expectedTargetY =
+            justBeforeHandoff.ballTargetY + justBeforeHandoff.ballVY * 0.05;
+        expect(afterHandoff.ballTargetY, closeTo(expectedTargetY, 1e-9));
+        // The displayed ball must glide smoothly from where it just was —
+        // not jump to somewhere derived from the stale target 0.5.
+        expect(
+          (afterHandoff.ballY - justBeforeHandoff.ballY).abs(),
+          lessThan(0.05),
+        );
+      },
+    );
+
+    test(
       'authoritativeAtCenter breaks the tie at the exact center: the owning '
       'side treats y == 0.5 as its own, the other defers',
       () {

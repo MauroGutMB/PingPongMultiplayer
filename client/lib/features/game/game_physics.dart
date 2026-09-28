@@ -14,6 +14,10 @@ GameState resetBall(GameState state, Random random) {
     ballY: 0.5,
     ballVX: kInitialBallSpeed * horizontal,
     ballVY: kInitialBallSpeed * (goingDown ? 1 : -1),
+    // Keep the dead-reckoning target in sync with the real position — see
+    // the note in advanceGame's authoritative branch for why this matters.
+    ballTargetX: 0.5,
+    ballTargetY: 0.5,
   );
 }
 
@@ -151,6 +155,15 @@ GameState advanceGame(
     ballY: ballY,
     ballVX: vx,
     ballVY: vy,
+    // Mirror our own true position into the dead-reckoning target while
+    // we're authoritative. If we didn't, the target could be stale by
+    // several rallies' worth of motion (it's only otherwise written when
+    // *not* authoritative) — then the instant the ball crosses into the
+    // opponent's half, the extrapolate branch above would start dead
+    // reckoning from that stale point instead of from here, and the ball
+    // would visibly jump to a wrong position.
+    ballTargetX: ballX,
+    ballTargetY: ballY,
     playerPaddleX: playerX,
   );
 }
