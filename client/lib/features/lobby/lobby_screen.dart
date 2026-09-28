@@ -74,11 +74,7 @@ class _NicknamePromptState extends State<_NicknamePrompt> {
             children: [
               const Text('Escolha um apelido'),
               const SizedBox(height: 12),
-              TextField(
-                controller: _controller,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
-                onSubmitted: _submit,
-              ),
+              TextField(controller: _controller, onSubmitted: _submit),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => _submit(_controller.text),

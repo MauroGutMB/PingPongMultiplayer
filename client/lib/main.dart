@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/theme.dart';
 import 'features/lobby/lobby_screen.dart';
 
 void main() {
@@ -14,7 +15,9 @@ class PingPongApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'PingPong Multiplayer',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal)),
+      themeMode: ThemeMode.dark,
+      darkTheme: appTheme,
+      theme: appTheme,
       home: const LobbyScreen(),
     );
   }
