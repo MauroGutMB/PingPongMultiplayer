@@ -83,15 +83,15 @@ Future<void> showInviteReceivedDialog(
       actions: [
         TextButton(
           onPressed: () {
-            controller.respondToInvite(false);
             Navigator.pop(context);
+            controller.respondToInvite(false);
           },
           child: const Text('Recusar'),
         ),
         FilledButton(
           onPressed: () {
-            controller.respondToInvite(true);
             Navigator.pop(context);
+            controller.respondToInvite(true);
           },
           child: const Text('Aceitar'),
         ),

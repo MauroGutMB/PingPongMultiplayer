@@ -138,11 +138,15 @@ class NetworkGameLoopController extends Notifier<GameState> {
     // broadcast its own still-uninitialized ball back at the server.
     final inServeGracePeriod =
         _authoritativeAtCenter && _matchAge < _serveGracePeriod;
-    if (!inServeGracePeriod && !_isMine(state.ballY)) {
+    final scoredJustNow = state.scoreTop != scoreTopBefore;
+    // A fresh re-serve after a point must always be broadcast, even by the
+    // side that doesn't own the center tie — otherwise a point scored while
+    // "top" was authoritative resets top's own ball but is never sent, and
+    // bottom's ball never returns to center.
+    if (!scoredJustNow && !inServeGracePeriod && !_isMine(state.ballY)) {
       return; // opponent's half: not ours to report on
     }
 
-    final scoredJustNow = state.scoreTop != scoreTopBefore;
     final bouncedJustNow = vyBefore != 0 && state.ballVY.sign != vyBefore.sign;
 
     _sinceBallBroadcast += dtDuration;
