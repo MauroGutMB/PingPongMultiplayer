@@ -60,9 +60,12 @@ class LobbyScreen extends ConsumerWidget {
         LobbyStatus.error => const Center(
           child: Text('Erro ao conectar ao servidor.'),
         ),
-        _ => _PlayerListView(
-          players: state.otherPlayers,
-          onTap: (player) => showSendInviteFlow(context, player, controller),
+        _ => RefreshIndicator(
+          onRefresh: controller.refreshPlayers,
+          child: _PlayerListView(
+            players: state.otherPlayers,
+            onTap: (player) => showSendInviteFlow(context, player, controller),
+          ),
         ),
       },
     );
@@ -127,7 +130,18 @@ class _PlayerListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (players.isEmpty) {
-      return const Center(child: Text('Nenhum outro jogador online no momento.'));
+      // Needs to stay scrollable even though it's empty — a RefreshIndicator
+      // above this only detects the pull gesture over a Scrollable, and an
+      // empty roster is exactly when someone is most likely to pull-to-refresh.
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          Padding(
+            padding: EdgeInsets.only(top: 96),
+            child: Center(child: Text('Nenhum outro jogador online no momento.')),
+          ),
+        ],
+      );
     }
     return ListView.separated(
       itemCount: players.length,

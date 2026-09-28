@@ -22,6 +22,10 @@ Map<String, dynamic> helloMessage(String nickname) => {
   'nickname': nickname,
 };
 
+Map<String, dynamic> requestPlayerListMessage() => {
+  'type': 'request_player_list',
+};
+
 Map<String, dynamic> inviteRequestMessage(String toId) => {
   'type': 'invite_request',
   'toId': toId,

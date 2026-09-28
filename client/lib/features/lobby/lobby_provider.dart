@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config.dart';
@@ -100,6 +102,7 @@ class LobbyState {
 
 class LobbyController extends Notifier<LobbyState> {
   late final LobbyTransport _transport;
+  Completer<void>? _pendingRefresh;
 
   @override
   LobbyState build() {
@@ -136,6 +139,8 @@ class LobbyController extends Notifier<LobbyState> {
             .map((p) => PlayerInfo.fromJson(p as Map<String, dynamic>))
             .toList();
         state = state.copyWith(players: players);
+        _pendingRefresh?.complete();
+        _pendingRefresh = null;
       case 'invite_request':
         state = state.copyWith(
           incomingInvite: IncomingInvite(
@@ -159,6 +164,19 @@ class LobbyController extends Notifier<LobbyState> {
           ),
         );
     }
+  }
+
+  /// Triggered by pull-to-refresh on the player list. The server already
+  /// pushes the roster on every join/leave, so this is a fallback for a
+  /// broadcast that was somehow missed, not the normal update path.
+  Future<void> refreshPlayers() {
+    final completer = Completer<void>();
+    _pendingRefresh = completer;
+    _transport.send(requestPlayerListMessage());
+    return completer.future.timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => _pendingRefresh = null,
+    );
   }
 
   void sendInvite(String toId) {
