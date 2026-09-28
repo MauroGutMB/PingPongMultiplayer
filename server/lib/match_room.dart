@@ -29,6 +29,11 @@ class MatchRoom {
 class MatchService {
   final Map<String, MatchRoom> _roomByPlayer = {};
 
+  /// toId -> fromId, for invites sent but not yet accepted/rejected. Only
+  /// one pending invite per target is tracked, matching the client's own
+  /// "one invite dialog at a time" UI.
+  final Map<String, String> _pendingInviteFromByTarget = {};
+
   bool isInMatch(String playerId) => _roomByPlayer.containsKey(playerId);
 
   void handleInviteRequest(Lobby lobby, String fromId, Map<String, dynamic> body) {
@@ -37,6 +42,7 @@ class MatchService {
     final inviter = lobby[fromId];
     final target = lobby[invite.toId];
     if (inviter == null || target == null || isInMatch(invite.toId)) return;
+    _pendingInviteFromByTarget[invite.toId] = fromId;
     target.send(
       InviteRequestNotification(fromId: fromId, fromNickname: inviter.nickname).toJson(),
     );
@@ -44,6 +50,7 @@ class MatchService {
 
   void handleInviteResponse(Lobby lobby, String fromId, Map<String, dynamic> body) {
     final response = InviteResponseMessage.fromJson(body);
+    _pendingInviteFromByTarget.remove(fromId);
     final responder = lobby[fromId];
     final inviter = lobby[response.toId];
     if (responder == null || inviter == null) return;
@@ -55,6 +62,28 @@ class MatchService {
     if (response.accepted && !isInMatch(fromId) && !isInMatch(response.toId)) {
       _startMatch(lobby, inviter: inviter, invitee: responder);
     }
+  }
+
+  /// Called when [playerId] disconnects while a lobby-level invite naming
+  /// them is still unanswered, so nobody is left waiting forever:
+  ///  - if they were the *target* of a pending invite, the inviter is told
+  ///    (as an implicit rejection) instead of waiting on a reply that will
+  ///    never come;
+  ///  - if they were the *inviter*, the pending record is just dropped —
+  ///    the target's own invite dialog has Accept/Reject either way and
+  ///    isn't blocking anything.
+  void cancelPendingInvitesFor(Lobby lobby, String playerId) {
+    final inviterId = _pendingInviteFromByTarget.remove(playerId);
+    if (inviterId != null) {
+      lobby[inviterId]?.send(
+        InviteResponseNotification(
+          fromId: playerId,
+          accepted: false,
+          disconnected: true,
+        ).toJson(),
+      );
+    }
+    _pendingInviteFromByTarget.removeWhere((_, inviter) => inviter == playerId);
   }
 
   void _startMatch(

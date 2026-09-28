@@ -123,17 +123,25 @@ class InviteResponseMessage {
   final bool accepted;
 }
 
-/// server -> client: forwards [fromId]'s accept/reject decision to the inviter.
+/// server -> client: forwards [fromId]'s accept/reject decision to the
+/// inviter — or, if [disconnected] is true, tells the inviter that [fromId]
+/// left before ever responding (so a pending invite doesn't wait forever).
 class InviteResponseNotification {
-  InviteResponseNotification({required this.fromId, required this.accepted});
+  InviteResponseNotification({
+    required this.fromId,
+    required this.accepted,
+    this.disconnected = false,
+  });
 
   final String fromId;
   final bool accepted;
+  final bool disconnected;
 
   Map<String, dynamic> toJson() => {
     'type': MessageType.inviteResponse.wireName,
     'fromId': fromId,
     'accepted': accepted,
+    'disconnected': disconnected,
   };
 }
 

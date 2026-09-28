@@ -103,5 +103,6 @@ void _handleConnection(
 void _handleDisconnect(String? playerId, Lobby lobby, MatchService matchService) {
   if (playerId == null) return;
   matchService.handleDisconnect(playerId);
+  matchService.cancelPendingInvitesFor(lobby, playerId);
   lobby.remove(playerId);
 }

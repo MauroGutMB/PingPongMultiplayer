@@ -49,6 +49,7 @@ class LobbyState {
     this.incomingInvite,
     this.outgoingInviteToId,
     this.inviteRejected = false,
+    this.inviteTargetLeft = false,
     this.matchStart,
   });
 
@@ -58,6 +59,11 @@ class LobbyState {
   final IncomingInvite? incomingInvite;
   final String? outgoingInviteToId;
   final bool inviteRejected;
+
+  /// True instead of [inviteRejected] when the invite went unanswered
+  /// because the invited player disconnected, rather than an actual reject.
+  final bool inviteTargetLeft;
+
   final MatchStart? matchStart;
 
   List<PlayerInfo> get otherPlayers =>
@@ -72,6 +78,7 @@ class LobbyState {
     String? outgoingInviteToId,
     bool clearOutgoingInvite = false,
     bool? inviteRejected,
+    bool? inviteTargetLeft,
     MatchStart? matchStart,
   }) {
     return LobbyState(
@@ -85,6 +92,7 @@ class LobbyState {
           ? null
           : (outgoingInviteToId ?? this.outgoingInviteToId),
       inviteRejected: inviteRejected ?? this.inviteRejected,
+      inviteTargetLeft: inviteTargetLeft ?? this.inviteTargetLeft,
       matchStart: matchStart ?? this.matchStart,
     );
   }
@@ -137,9 +145,11 @@ class LobbyController extends Notifier<LobbyState> {
         );
       case 'invite_response':
         final accepted = json['accepted'] as bool;
+        final disconnected = json['disconnected'] as bool? ?? false;
         state = state.copyWith(
           clearOutgoingInvite: true,
-          inviteRejected: !accepted,
+          inviteRejected: !accepted && !disconnected,
+          inviteTargetLeft: !accepted && disconnected,
         );
       case 'match_start':
         state = state.copyWith(
@@ -164,7 +174,7 @@ class LobbyController extends Notifier<LobbyState> {
   }
 
   void acknowledgeRejection() {
-    state = state.copyWith(inviteRejected: false);
+    state = state.copyWith(inviteRejected: false, inviteTargetLeft: false);
   }
 }
 

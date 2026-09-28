@@ -25,6 +25,12 @@ class LobbyScreen extends ConsumerWidget {
         ).showSnackBar(const SnackBar(content: Text('Seu convite foi recusado.')));
         controller.acknowledgeRejection();
       }
+      if (next.inviteTargetLeft && previous?.inviteTargetLeft != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('O jogador saiu antes de responder.')),
+        );
+        controller.acknowledgeRejection();
+      }
       if (next.matchStart != null && previous?.matchStart != next.matchStart) {
         Navigator.of(
           context,

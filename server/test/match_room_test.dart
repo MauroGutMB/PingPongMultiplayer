@@ -49,7 +49,7 @@ void main() {
     matchService.handleInviteResponse(lobby, bob.id, {'toId': alice.id, 'accepted': true});
 
     expect(alice.inbox, [
-      {'type': 'invite_response', 'fromId': 'b', 'accepted': true},
+      {'type': 'invite_response', 'fromId': 'b', 'accepted': true, 'disconnected': false},
       {'type': 'match_start', 'matchId': anything, 'side': 'bottom'},
     ]);
     // Bob also sees the lobby's player_list update triggered by Alice's
@@ -66,7 +66,12 @@ void main() {
   test('rejected invite_response notifies the inviter and starts no match', () {
     matchService.handleInviteResponse(lobby, bob.id, {'toId': alice.id, 'accepted': false});
 
-    expect(alice.inbox.single, {'type': 'invite_response', 'fromId': 'b', 'accepted': false});
+    expect(alice.inbox.single, {
+      'type': 'invite_response',
+      'fromId': 'b',
+      'accepted': false,
+      'disconnected': false,
+    });
     expect(matchService.isInMatch(alice.id), isFalse);
     expect(matchService.isInMatch(bob.id), isFalse);
   });
@@ -113,5 +118,70 @@ void main() {
   test('leaveMatch is a no-op for a player who is not in a match', () {
     expect(matchService.leaveMatch(alice.id), isNull);
     expect(alice.inbox, isEmpty);
+  });
+
+  group('cancelPendingInvitesFor', () {
+    test(
+      'notifies the inviter when the invited player disconnects before responding',
+      () {
+        matchService.handleInviteRequest(lobby, alice.id, {'toId': bob.id});
+        bob.inbox.clear();
+
+        matchService.cancelPendingInvitesFor(lobby, bob.id);
+
+        expect(alice.inbox.single, {
+          'type': 'invite_response',
+          'fromId': 'b',
+          'accepted': false,
+          'disconnected': true,
+        });
+      },
+    );
+
+    test('a later real response from the target is unaffected by a stale cancel', () {
+      matchService.handleInviteRequest(lobby, alice.id, {'toId': bob.id});
+      matchService.handleInviteResponse(lobby, bob.id, {
+        'toId': alice.id,
+        'accepted': true,
+      });
+      alice.inbox.clear();
+
+      // Some other, unrelated disconnect happening afterwards must not
+      // re-notify alice about an invite that was already resolved.
+      matchService.cancelPendingInvitesFor(lobby, bob.id);
+
+      expect(alice.inbox, isEmpty);
+    });
+
+    test('is a no-op when the disconnecting player has no pending invite', () {
+      matchService.cancelPendingInvitesFor(lobby, alice.id);
+
+      expect(alice.inbox, isEmpty);
+      expect(bob.inbox, isEmpty);
+    });
+
+    test(
+      'drops the pending record when the inviter (not the target) disconnects',
+      () {
+        matchService.handleInviteRequest(lobby, alice.id, {'toId': bob.id});
+        bob.inbox.clear();
+
+        // Mirrors what bin/server.dart's _handleDisconnect does on a real
+        // disconnect: cancel bookkeeping, then remove from the lobby.
+        matchService.cancelPendingInvitesFor(lobby, alice.id);
+        lobby.remove(alice.id);
+        bob.inbox.clear(); // discard the player_list broadcast from removing alice
+
+        // If bob now responds anyway, the server just finds no live inviter
+        // in the lobby and drops it — no match, no crash.
+        matchService.handleInviteResponse(lobby, bob.id, {
+          'toId': alice.id,
+          'accepted': true,
+        });
+
+        expect(bob.inbox, isEmpty);
+        expect(matchService.isInMatch(bob.id), isFalse);
+      },
+    );
   });
 }

@@ -161,6 +161,45 @@ void main() {
     expect(find.text('Seu convite foi recusado.'), findsOneWidget);
   });
 
+  testWidgets(
+    'invite target disconnecting before responding shows a distinct message '
+    'and unblocks the waiting dialog',
+    (tester) async {
+      final transport = FakeLobbyTransport();
+      await _enterLobby(
+        tester,
+        transport,
+        players: [
+          {'id': 'bob', 'nickname': 'Bob', 'ip': '10.0.0.2'},
+        ],
+      );
+
+      await tester.tap(find.text('Bob'));
+      await _pump(tester);
+      await tester.tap(find.text('Convidar'));
+      // A single pump, not pumpAndSettle: the waiting dialog shows an
+      // indeterminate CircularProgressIndicator, whose animation never settles.
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Aguardando resposta de Bob...'), findsOneWidget);
+
+      transport.receive({
+        'type': 'invite_response',
+        'fromId': 'bob',
+        'accepted': false,
+        'disconnected': true,
+      });
+      // Not pumpAndSettle: it would also wait out the SnackBar's auto-dismiss
+      // timer, so by the time we assert it would already be gone.
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Aguardando resposta de Bob...'), findsNothing);
+      expect(find.text('O jogador saiu antes de responder.'), findsOneWidget);
+      expect(find.text('Seu convite foi recusado.'), findsNothing);
+    },
+  );
+
   testWidgets('incoming invite shows accept/reject popup and responds', (
     tester,
   ) async {
@@ -185,4 +224,47 @@ void main() {
       'accepted': true,
     });
   });
+
+  testWidgets(
+    'declining an incoming invite closes the popup cleanly and leaves the '
+    'lobby fully visible and interactive',
+    (tester) async {
+      final transport = FakeLobbyTransport();
+      await _enterLobby(
+        tester,
+        transport,
+        players: [
+          {'id': 'bob', 'nickname': 'Bob', 'ip': '10.0.0.2'},
+        ],
+      );
+
+      transport.receive({
+        'type': 'invite_request',
+        'fromId': 'carol',
+        'fromNickname': 'Carol',
+      });
+      await _pump(tester);
+      expect(find.text('Carol te convidou para uma partida.'), findsOneWidget);
+
+      await tester.tap(find.text('Recusar'));
+      await _pump(tester);
+
+      expect(transport.sent.last, {
+        'type': 'invite_response',
+        'toId': 'carol',
+        'accepted': false,
+      });
+      // The popup is gone and the ordinary lobby is back — no leftover
+      // barrier, no stuck black overlay, nothing else covering the screen.
+      expect(find.text('Carol te convidou para uma partida.'), findsNothing);
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.text('Bob'), findsOneWidget);
+
+      // The lobby is still fully functional afterwards — tapping another
+      // player still works normally.
+      await tester.tap(find.text('Bob'));
+      await _pump(tester);
+      expect(find.text('Convidar Bob para uma partida?'), findsOneWidget);
+    },
+  );
 }
