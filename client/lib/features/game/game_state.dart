@@ -9,8 +9,11 @@ class GameState {
     this.ballY = 0.5,
     this.ballVX = 0,
     this.ballVY = 0,
+    this.ballTargetX = 0.5,
+    this.ballTargetY = 0.5,
     this.paddleWidth = kPaddleWidthFraction,
     this.opponentPaddleX = 0.5,
+    this.opponentPaddleTargetX = 0.5,
     this.playerPaddleX = 0.5,
     this.scoreTop = 0,
     this.scoreBottom = 0,
@@ -23,8 +26,22 @@ class GameState {
   final double ballY;
   final double ballVX;
   final double ballVY;
+
+  /// Only meaningful for networked matches, while the ball is on the
+  /// opponent's half: the last position they reported, dead-reckoned forward
+  /// by [ballVX]/[ballVY] every tick. [ballX]/[ballY] smoothly chase this
+  /// instead of snapping to it, so a network update never looks like a
+  /// teleport — see advanceGame's opponent-half branch.
+  final double ballTargetX;
+  final double ballTargetY;
+
   final double paddleWidth;
   final double opponentPaddleX;
+
+  /// The opponent's real paddle position as last reported over the network.
+  /// [opponentPaddleX] smoothly chases this every tick instead of snapping.
+  final double opponentPaddleTargetX;
+
   final double playerPaddleX;
   final int scoreTop;
   final int scoreBottom;
@@ -40,7 +57,10 @@ class GameState {
     double? ballY,
     double? ballVX,
     double? ballVY,
+    double? ballTargetX,
+    double? ballTargetY,
     double? opponentPaddleX,
+    double? opponentPaddleTargetX,
     double? playerPaddleX,
     int? scoreTop,
     int? scoreBottom,
@@ -53,8 +73,12 @@ class GameState {
       ballY: ballY ?? this.ballY,
       ballVX: ballVX ?? this.ballVX,
       ballVY: ballVY ?? this.ballVY,
+      ballTargetX: ballTargetX ?? this.ballTargetX,
+      ballTargetY: ballTargetY ?? this.ballTargetY,
       paddleWidth: paddleWidth,
       opponentPaddleX: opponentPaddleX ?? this.opponentPaddleX,
+      opponentPaddleTargetX:
+          opponentPaddleTargetX ?? this.opponentPaddleTargetX,
       playerPaddleX: playerPaddleX ?? this.playerPaddleX,
       scoreTop: scoreTop ?? this.scoreTop,
       scoreBottom: scoreBottom ?? this.scoreBottom,

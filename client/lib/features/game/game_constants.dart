@@ -15,3 +15,9 @@ const double kStationaryHitDamping = 0.9;
 
 /// Hard cap on horizontal speed so repeated spin hits can't run away.
 const double kMaxBallSpeed = 1.5;
+
+/// How eagerly the opponent's paddle/ball glide toward their real, networked
+/// position (per second). Higher closes the gap faster (more responsive,
+/// closer to instant) but a snappier catch-up is more visible; lower reads
+/// smoother but lags further behind during fast movement.
+const double kOpponentSmoothingRate = 15.0;

@@ -36,6 +36,10 @@ GameState resetBall(GameState state, Random random) {
   return (vx: pushedVx, vy: bouncedVy);
 }
 
+/// Fraction of the remaining gap to a network target closed this tick, for a
+/// framerate-independent exponential "chase" (see [kOpponentSmoothingRate]).
+double _smoothingFactor(double dt) => 1 - exp(-kOpponentSmoothingRate * dt);
+
 /// Advances the match by [dt] seconds: moves the player paddle, moves the
 /// ball, resolves wall/paddle collisions, and awards a point (then re-serves)
 /// on a miss. Pure function of its inputs so it can be unit-tested without a
@@ -43,9 +47,16 @@ GameState resetBall(GameState state, Random random) {
 ///
 /// With [restrictToOwnHalf], the ball is only simulated (and can only score)
 /// while it's on the player's own half — the half where a real networked
-/// opponent is the authority just extrapolates the ball's last known
-/// trajectory instead of colliding it with anything, since the opponent's
-/// own device is the one resolving that side of the court.
+/// opponent is the authority just dead-reckons the ball's last known
+/// trajectory (via [GameState.ballTargetX]/[GameState.ballTargetY]) instead
+/// of colliding it with anything, since the opponent's own device is the one
+/// resolving that side of the court. The displayed [GameState.ballX]/
+/// [GameState.ballY] smoothly chase that target rather than snapping to each
+/// network update — see [applyOpponentBall].
+///
+/// The opponent's paddle is handled the same way: [GameState.opponentPaddleX]
+/// always glides toward [GameState.opponentPaddleTargetX] rather than
+/// teleporting on every [applyOpponentPaddle] call.
 ///
 /// The center line (y == 0.5) is where a serve or re-serve always starts,
 /// and both peers compute it independently — without a tie-break, both
@@ -63,6 +74,13 @@ GameState advanceGame(
 }) {
   if (state.matchOver || dt <= 0) return state;
 
+  final smoothing = _smoothingFactor(dt);
+  state = state.copyWith(
+    opponentPaddleX:
+        state.opponentPaddleX +
+        (state.opponentPaddleTargetX - state.opponentPaddleX) * smoothing,
+  );
+
   final halfPaddle = state.paddleWidth / 2;
   var playerX = state.playerPaddleX;
   final playerVelocity = switch (playerDirection) {
@@ -74,9 +92,13 @@ GameState advanceGame(
 
   final isOwnHalf = authoritativeAtCenter ? state.ballY >= 0.5 : state.ballY > 0.5;
   if (restrictToOwnHalf && !isOwnHalf) {
+    final targetX = (state.ballTargetX + state.ballVX * dt).clamp(0.0, 1.0);
+    final targetY = state.ballTargetY + state.ballVY * dt;
     return state.copyWith(
-      ballX: (state.ballX + state.ballVX * dt).clamp(0.0, 1.0),
-      ballY: state.ballY + state.ballVY * dt,
+      ballX: state.ballX + (targetX - state.ballX) * smoothing,
+      ballY: state.ballY + (targetY - state.ballY) * smoothing,
+      ballTargetX: targetX,
+      ballTargetY: targetY,
       playerPaddleX: playerX,
     );
   }
@@ -134,9 +156,11 @@ GameState advanceGame(
 }
 
 /// Applies the opponent's paddle_state (their horizontal position only —
-/// their paddle's on-screen row never changes).
+/// their paddle's on-screen row never changes). Only updates the *target*;
+/// [GameState.opponentPaddleX] glides toward it in [advanceGame] instead of
+/// snapping, so movement reads as smooth rather than teleporting.
 GameState applyOpponentPaddle(GameState state, double x) {
-  return state.copyWith(opponentPaddleX: x);
+  return state.copyWith(opponentPaddleTargetX: x);
 }
 
 /// Applies the opponent's ball_state. Each player's [GameState] is
@@ -144,6 +168,10 @@ GameState applyOpponentPaddle(GameState state, double x) {
 /// (their own egocentric view, mirrored top/bottom from ours) need a Y-flip
 /// before they mean anything on our side. X isn't mirrored between the two
 /// views, so it passes through unchanged.
+///
+/// Only sets the ball's *target* and velocity; [GameState.ballX]/
+/// [GameState.ballY] glide toward the target in [advanceGame] instead of
+/// snapping straight to it.
 GameState applyOpponentBall(
   GameState state, {
   required double x,
@@ -151,7 +179,12 @@ GameState applyOpponentBall(
   required double vx,
   required double vy,
 }) {
-  return state.copyWith(ballX: x, ballY: 1 - y, ballVX: vx, ballVY: -vy);
+  return state.copyWith(
+    ballTargetX: x,
+    ballTargetY: 1 - y,
+    ballVX: vx,
+    ballVY: -vy,
+  );
 }
 
 /// Applies an incoming score_update: the sender just missed on their own

@@ -181,26 +181,43 @@ void main() {
   });
 
   group('restrictToOwnHalf (networked match)', () {
-    test('ball on the opponent half just extrapolates, ignoring collisions', () {
+    test('ball on the opponent half dead-reckons the target and glides toward it', () {
+      const dt = 0.05;
       final state = GameState(
         ballX: 0.5,
         ballY: 0.05, // deep in the opponent's half
         ballVX: 0.3,
         ballVY: -1.0,
+        ballTargetX: 0.5,
+        ballTargetY: 0.05,
         opponentPaddleX: 0.9, // far from the ball: would "score" if simulated
       );
 
       final next = advanceGame(
         state,
-        0.05,
+        dt,
         random: random,
         restrictToOwnHalf: true,
       );
 
-      // Straight-line motion, no bounce, no score — the opponent's device
-      // owns physics over there.
-      expect(next.ballX, closeTo(0.5 + 0.3 * 0.05, 1e-9));
-      expect(next.ballY, closeTo(0.05 - 1.0 * 0.05, 1e-9));
+      // The target dead-reckons in a straight line (no bounce, no score — the
+      // opponent's device owns physics over there)...
+      final expectedTargetX = 0.5 + 0.3 * dt;
+      final expectedTargetY = 0.05 - 1.0 * dt;
+      expect(next.ballTargetX, closeTo(expectedTargetX, 1e-9));
+      expect(next.ballTargetY, closeTo(expectedTargetY, 1e-9));
+
+      // ...and the displayed position glides toward that target rather than
+      // snapping straight to it.
+      final smoothing = 1 - exp(-15.0 * dt);
+      expect(
+        next.ballX,
+        closeTo(0.5 + (expectedTargetX - 0.5) * smoothing, 1e-9),
+      );
+      expect(
+        next.ballY,
+        closeTo(0.05 + (expectedTargetY - 0.05) * smoothing, 1e-9),
+      );
       expect(next.ballVX, 0.3);
       expect(next.ballVY, -1.0);
       expect(next.scoreTop, 0);
@@ -241,9 +258,16 @@ void main() {
       expect(next.playerPaddleX, lessThan(0.5));
     });
 
-    test('extrapolation clamps the ball at the left/right walls', () {
-      // ballY < 0.5: the opponent's half, so this only extrapolates.
-      final state = GameState(ballX: 0.99, ballY: 0.4, ballVX: 5, ballVY: -1);
+    test('the dead-reckoned target clamps at the left/right walls', () {
+      // ballY < 0.5: the opponent's half, so this only dead-reckons.
+      final state = GameState(
+        ballX: 0.99,
+        ballY: 0.4,
+        ballVX: 5,
+        ballVY: -1,
+        ballTargetX: 0.99,
+        ballTargetY: 0.4,
+      );
 
       final next = advanceGame(
         state,
@@ -252,7 +276,10 @@ void main() {
         restrictToOwnHalf: true,
       );
 
-      expect(next.ballX, 1.0);
+      expect(next.ballTargetX, 1.0);
+      // Displayed position glides toward the clamped target, so after a full
+      // second it should have nearly (but not necessarily exactly) caught up.
+      expect(next.ballX, closeTo(1.0, 1e-3));
     });
 
     test(
@@ -277,31 +304,45 @@ void main() {
           restrictToOwnHalf: true,
           authoritativeAtCenter: false,
         );
-        // Defers: this is just extrapolation, not collision handling, but
-        // the key point is both agree on who's driving — never both.
-        expect(deferring.ballY, closeTo(0.5 - 1 * 0.05, 1e-9));
+        // Defers: this is dead-reckoning, not collision handling, but the
+        // key point is both agree on who's driving — never both. The target
+        // dead-reckons exactly; the displayed position glides toward it.
+        const dt = 0.05;
+        final expectedTargetY = 0.5 - 1 * dt;
+        expect(deferring.ballTargetY, closeTo(expectedTargetY, 1e-9));
+        final smoothing = 1 - exp(-15.0 * dt);
+        expect(
+          deferring.ballY,
+          closeTo(0.5 + (expectedTargetY - 0.5) * smoothing, 1e-9),
+        );
       },
     );
   });
 
   group('applying opponent updates', () {
-    test('applyOpponentPaddle sets the opponent paddle position', () {
+    test('applyOpponentPaddle sets the target the paddle then glides toward', () {
       const state = GameState(opponentPaddleX: 0.5);
 
       final next = applyOpponentPaddle(state, 0.8);
 
-      expect(next.opponentPaddleX, 0.8);
+      // Only the target moves immediately; the displayed position glides
+      // toward it on the next advanceGame tick instead of snapping.
+      expect(next.opponentPaddleTargetX, 0.8);
+      expect(next.opponentPaddleX, 0.5);
     });
 
-    test('applyOpponentBall mirrors the sender\'s egocentric coordinates', () {
+    test('applyOpponentBall mirrors the sender\'s egocentric coordinates into the target', () {
       const state = GameState();
 
       final next = applyOpponentBall(state, x: 0.7, y: 0.9, vx: 0.2, vy: 0.4);
 
       // x/vx pass through; y/vy flip since the sender's "their own half" is
-      // our "opponent's half".
-      expect(next.ballX, 0.7);
-      expect(next.ballY, closeTo(0.1, 1e-9));
+      // our "opponent's half". Only the target snaps; the displayed ball
+      // glides toward it on the next advanceGame tick.
+      expect(next.ballTargetX, 0.7);
+      expect(next.ballTargetY, closeTo(0.1, 1e-9));
+      expect(next.ballX, 0.5);
+      expect(next.ballY, 0.5);
       expect(next.ballVX, 0.2);
       expect(next.ballVY, -0.4);
     });
