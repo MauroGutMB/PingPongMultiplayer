@@ -70,6 +70,19 @@ firewall_rule_exists() {
   powershell.exe -NoProfile -Command "if (Get-NetFirewallRule -DisplayName '$RULE_NAME' -ErrorAction SilentlyContinue) { Write-Output yes } else { Write-Output no }" | tr -d '\r\n'
 }
 
+# netsh writes its own failures to stdout instead of a terminating error, so
+# piping it through `| Out-Null` (as the elevated block does) silently
+# swallows them — the script would report success even when the portproxy
+# rule was never actually created. Check the real table instead of trusting
+# the elevated block's exit status.
+portproxy_rule_matches() {
+  local expected_addr="$1"
+  powershell.exe -NoProfile -Command "netsh interface portproxy show v4tov4" \
+    | tr -d '\r' \
+    | awk -v port="$PORT" -v addr="$expected_addr" \
+        '$1=="0.0.0.0" && $2==port && $3==addr && $4==port { found=1 } END { exit !found }'
+}
+
 run_elevated_ps1() {
   local tmp_ps1 win_path
   tmp_ps1="$(mktemp --suffix=.ps1)"
@@ -125,6 +138,15 @@ PSEOF
     exit 1
   fi
 
+  if ! portproxy_rule_matches "$wsl_addr"; then
+    echo "Erro: o firewall foi liberado, mas o portproxy não ficou ativo." >&2
+    echo "O 'netsh' roda dentro do processo elevado e falha silenciosamente se algo der errado," >&2
+    echo "então essa verificação pega o caso em que a janela do UAC pareceu ter dado certo mas não deu." >&2
+    echo "Tente abrir um PowerShell 'Executar como administrador' manualmente e rodar:" >&2
+    echo "  netsh interface portproxy add v4tov4 listenport=$PORT listenaddress=0.0.0.0 connectport=$PORT connectaddress=$wsl_addr" >&2
+    exit 1
+  fi
+
   local url="ws://$win_addr:$PORT"
   publish_gist "$url"
 
@@ -167,6 +189,11 @@ show_status() {
     echo "Gist: (ainda não criado)"
   fi
   echo "Regra de firewall presente: $(firewall_rule_exists)"
+  if portproxy_rule_matches "$(wsl_ip)"; then
+    echo "Portproxy ativo e apontando para o WSL atual: sim"
+  else
+    echo "Portproxy ativo e apontando para o WSL atual: não"
+  fi
 }
 
 case "${1:-toggle}" in
