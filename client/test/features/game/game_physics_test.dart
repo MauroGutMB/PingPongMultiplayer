@@ -179,4 +179,98 @@ void main() {
     expect(next.ballVX, closeTo(0.55 * 0.3, 1e-9));
     expect(next.ballVY, -0.55);
   });
+
+  group('restrictToOwnHalf (networked match)', () {
+    test('ball on the opponent half just extrapolates, ignoring collisions', () {
+      final state = GameState(
+        ballX: 0.5,
+        ballY: 0.05, // deep in the opponent's half
+        ballVX: 0.3,
+        ballVY: -1.0,
+        opponentPaddleX: 0.9, // far from the ball: would "score" if simulated
+      );
+
+      final next = advanceGame(
+        state,
+        0.05,
+        random: random,
+        restrictToOwnHalf: true,
+      );
+
+      // Straight-line motion, no bounce, no score — the opponent's device
+      // owns physics over there.
+      expect(next.ballX, closeTo(0.5 + 0.3 * 0.05, 1e-9));
+      expect(next.ballY, closeTo(0.05 - 1.0 * 0.05, 1e-9));
+      expect(next.ballVX, 0.3);
+      expect(next.ballVY, -1.0);
+      expect(next.scoreTop, 0);
+      expect(next.scoreBottom, 0);
+    });
+
+    test('ball on our own half still collides and scores normally', () {
+      final state = GameState(
+        ballX: 0.5,
+        ballY: 0.93,
+        ballVX: 0.0,
+        ballVY: 1.0,
+        playerPaddleX: 0.9, // far from the ball: a real miss
+      );
+
+      final next = advanceGame(
+        state,
+        0.05,
+        random: random,
+        restrictToOwnHalf: true,
+      );
+
+      expect(next.scoreTop, 1);
+      expect(next.ballY, 0.5); // re-served after the point
+    });
+
+    test('the player paddle still moves on the opponent half', () {
+      final state = GameState(ballY: 0.1, playerPaddleX: 0.5);
+
+      final next = advanceGame(
+        state,
+        0.1,
+        playerDirection: MoveDirection.left,
+        random: random,
+        restrictToOwnHalf: true,
+      );
+
+      expect(next.playerPaddleX, lessThan(0.5));
+    });
+  });
+
+  group('applying opponent updates', () {
+    test('applyOpponentPaddle sets the opponent paddle position', () {
+      const state = GameState(opponentPaddleX: 0.5);
+
+      final next = applyOpponentPaddle(state, 0.8);
+
+      expect(next.opponentPaddleX, 0.8);
+    });
+
+    test('applyOpponentBall mirrors the sender\'s egocentric coordinates', () {
+      const state = GameState();
+
+      final next = applyOpponentBall(state, x: 0.7, y: 0.9, vx: 0.2, vy: 0.4);
+
+      // x/vx pass through; y/vy flip since the sender's "their own half" is
+      // our "opponent's half".
+      expect(next.ballX, 0.7);
+      expect(next.ballY, closeTo(0.1, 1e-9));
+      expect(next.ballVX, 0.2);
+      expect(next.ballVY, -0.4);
+    });
+
+    test('applyOpponentScored awards us the point', () {
+      const state = GameState(scoreBottom: 2, scoreTop: 5);
+
+      final next = applyOpponentScored(state);
+
+      expect(next.scoreBottom, 3);
+      expect(next.scoreTop, 5);
+    });
+  });
 }

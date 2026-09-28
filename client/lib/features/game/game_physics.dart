@@ -40,11 +40,18 @@ GameState resetBall(GameState state, Random random) {
 /// ball, resolves wall/paddle collisions, and awards a point (then re-serves)
 /// on a miss. Pure function of its inputs so it can be unit-tested without a
 /// running [Ticker].
+///
+/// With [restrictToOwnHalf], the ball is only simulated (and can only score)
+/// while it's on the player's own half (y >= 0.5) — the half where a real
+/// networked opponent is the authority just extrapolates the ball's last
+/// known trajectory instead of colliding it with anything, since the
+/// opponent's own device is the one resolving that side of the court.
 GameState advanceGame(
   GameState state,
   double dt, {
   MoveDirection? playerDirection,
   required Random random,
+  bool restrictToOwnHalf = false,
 }) {
   if (state.matchOver || dt <= 0) return state;
 
@@ -56,6 +63,14 @@ GameState advanceGame(
     null => 0.0,
   };
   playerX = (playerX + playerVelocity * dt).clamp(halfPaddle, 1 - halfPaddle);
+
+  if (restrictToOwnHalf && state.ballY < 0.5) {
+    return state.copyWith(
+      ballX: state.ballX + state.ballVX * dt,
+      ballY: state.ballY + state.ballVY * dt,
+      playerPaddleX: playerX,
+    );
+  }
 
   // The opponent paddle doesn't move on its own yet, so it always counts as
   // stationary until a real opponent drives it over the network.
@@ -107,4 +122,31 @@ GameState advanceGame(
     ballVY: vy,
     playerPaddleX: playerX,
   );
+}
+
+/// Applies the opponent's paddle_state (their horizontal position only —
+/// their paddle's on-screen row never changes).
+GameState applyOpponentPaddle(GameState state, double x) {
+  return state.copyWith(opponentPaddleX: x);
+}
+
+/// Applies the opponent's ball_state. Each player's [GameState] is
+/// egocentric — "my" half is always y >= 0.5 — so the sender's coordinates
+/// (their own egocentric view, mirrored top/bottom from ours) need a Y-flip
+/// before they mean anything on our side. X isn't mirrored between the two
+/// views, so it passes through unchanged.
+GameState applyOpponentBall(
+  GameState state, {
+  required double x,
+  required double y,
+  required double vx,
+  required double vy,
+}) {
+  return state.copyWith(ballX: x, ballY: 1 - y, ballVX: vx, ballVY: -vy);
+}
+
+/// Applies an incoming score_update: the sender just missed on their own
+/// half, so the point is ours.
+GameState applyOpponentScored(GameState state) {
+  return state.copyWith(scoreBottom: state.scoreBottom + 1);
 }

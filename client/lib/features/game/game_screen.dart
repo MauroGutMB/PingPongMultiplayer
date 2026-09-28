@@ -5,18 +5,21 @@ import '../../core/theme.dart';
 import 'game_constants.dart';
 import 'game_loop_controller.dart';
 import 'game_state.dart';
+import 'network_game_loop_controller.dart';
 import 'widgets/ball_widget.dart';
 import 'widgets/control_buttons.dart';
 import 'widgets/paddle_widget.dart';
 
-class GameScreen extends ConsumerWidget {
-  const GameScreen({super.key});
+/// Renders a [GameState] and wires the control buttons to [onDirectionChanged]
+/// — shared by the standalone practice screen and the real networked match.
+class GameView extends StatelessWidget {
+  const GameView({super.key, required this.state, required this.onDirectionChanged});
+
+  final GameState state;
+  final ValueChanged<MoveDirection?> onDirectionChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(gameLoopProvider);
-    final controller = ref.read(gameLoopProvider.notifier);
-
+  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -24,14 +27,36 @@ class GameScreen extends ConsumerWidget {
             Expanded(flex: 4, child: _FieldSection(state: state)),
             Expanded(
               flex: 1,
-              child: ControlButtons(
-                onDirectionChanged: controller.setPlayerDirection,
-              ),
+              child: ControlButtons(onDirectionChanged: onDirectionChanged),
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+/// Standalone local practice: no opponent, no network.
+class GameScreen extends ConsumerWidget {
+  const GameScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(gameLoopProvider);
+    final controller = ref.read(gameLoopProvider.notifier);
+    return GameView(state: state, onDirectionChanged: controller.setPlayerDirection);
+  }
+}
+
+/// A real match against another connected player.
+class NetworkGameScreen extends ConsumerWidget {
+  const NetworkGameScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(networkGameLoopProvider);
+    final controller = ref.read(networkGameLoopProvider.notifier);
+    return GameView(state: state, onDirectionChanged: controller.setPlayerDirection);
   }
 }
 

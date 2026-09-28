@@ -26,9 +26,9 @@ class LobbyScreen extends ConsumerWidget {
         controller.acknowledgeRejection();
       }
       if (next.matchStart != null && previous?.matchStart != next.matchStart) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Partida encontrada! Lado: ${next.matchStart!.side}')),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const NetworkGameScreen()));
       }
     });
 
