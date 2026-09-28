@@ -1,0 +1,17 @@
+name: pingpong_server
+description: Lobby and match-relay WebSocket server for PingPong Multiplayer.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  shelf: ^1.4.1
+  shelf_web_socket: ^2.0.0
+  web_socket_channel: ^2.4.5
+  uuid: ^4.4.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^4.0.0
