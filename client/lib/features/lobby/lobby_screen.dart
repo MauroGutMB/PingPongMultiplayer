@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/protocol.dart';
+import '../game/game_screen.dart';
 import 'invite_dialog.dart';
 import 'lobby_provider.dart';
 
@@ -36,7 +37,18 @@ class LobbyScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Jogadores online')),
+      appBar: AppBar(
+        title: const Text('Jogadores online'),
+        actions: [
+          IconButton(
+            tooltip: 'Testar jogo local (sem oponente)',
+            icon: const Icon(Icons.sports_esports),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const GameScreen()),
+            ),
+          ),
+        ],
+      ),
       body: switch (state.status) {
         LobbyStatus.connecting => const Center(child: CircularProgressIndicator()),
         LobbyStatus.error => const Center(

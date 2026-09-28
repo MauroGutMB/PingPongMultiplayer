@@ -4,10 +4,13 @@ import '../../../core/theme.dart';
 
 enum MoveDirection { left, right }
 
-/// Bottom control section: two large hold-to-move buttons. Purely visual for
-/// now — pressing highlights the button but doesn't move anything yet.
+/// Bottom control section: two large hold-to-move buttons. Highlights while
+/// pressed and reports the held direction (or null on release) via
+/// [onDirectionChanged].
 class ControlButtons extends StatefulWidget {
-  const ControlButtons({super.key});
+  const ControlButtons({super.key, this.onDirectionChanged});
+
+  final ValueChanged<MoveDirection?>? onDirectionChanged;
 
   @override
   State<ControlButtons> createState() => _ControlButtonsState();
@@ -15,6 +18,11 @@ class ControlButtons extends StatefulWidget {
 
 class _ControlButtonsState extends State<ControlButtons> {
   MoveDirection? _pressed;
+
+  void _setPressed(MoveDirection? direction) {
+    setState(() => _pressed = direction);
+    widget.onDirectionChanged?.call(direction);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +32,8 @@ class _ControlButtonsState extends State<ControlButtons> {
           child: _ControlButton(
             icon: Icons.arrow_left,
             pressed: _pressed == MoveDirection.left,
-            onPressStart: () => setState(() => _pressed = MoveDirection.left),
-            onPressEnd: () => setState(() => _pressed = null),
+            onPressStart: () => _setPressed(MoveDirection.left),
+            onPressEnd: () => _setPressed(null),
           ),
         ),
         Container(width: 1, color: AppColors.purpleDark),
@@ -33,8 +41,8 @@ class _ControlButtonsState extends State<ControlButtons> {
           child: _ControlButton(
             icon: Icons.arrow_right,
             pressed: _pressed == MoveDirection.right,
-            onPressStart: () => setState(() => _pressed = MoveDirection.right),
-            onPressEnd: () => setState(() => _pressed = null),
+            onPressStart: () => _setPressed(MoveDirection.right),
+            onPressEnd: () => _setPressed(null),
           ),
         ),
       ],
