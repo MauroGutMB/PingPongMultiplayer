@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,6 +38,23 @@ void main() {
         .map((e) => tester.getCenter(find.byWidget(e.widget)))
         .toList();
     expect(positions[0].dy, lessThan(positions[1].dy));
+
+    await teardown(tester);
+  });
+
+  testWidgets('opponent paddle never overlaps the score/timer boxes', (
+    tester,
+  ) async {
+    await pumpGameScreen(tester);
+
+    final scoreBoxBottom = tester.getBottomLeft(find.text('TEMPO')).dy;
+    final topmostPaddleTop = find
+        .byType(PaddleWidget)
+        .evaluate()
+        .map((e) => tester.getRect(find.byWidget(e.widget)).top)
+        .reduce(min);
+
+    expect(topmostPaddleTop, greaterThanOrEqualTo(scoreBoxBottom));
 
     await teardown(tester);
   });

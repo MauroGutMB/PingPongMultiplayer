@@ -83,7 +83,28 @@ void main() {
     expect(next.ballVX, -1.0);
   });
 
-  test('ball bounces off the player paddle when aligned with it', () {
+  test(
+    'ball keeps its trajectory (but loses some speed) hitting a stationary paddle',
+    () {
+      final state = GameState(
+        ballX: 0.5,
+        ballY: 0.93,
+        ballVX: 0.2,
+        ballVY: 1.0,
+        playerPaddleX: 0.5,
+      );
+
+      // No playerDirection passed: the paddle isn't moving.
+      final next = advanceGame(state, 0.05, random: random);
+
+      expect(next.ballVY, closeTo(-1.0 * 0.9, 1e-9));
+      expect(next.ballVX, closeTo(0.2 * 0.9, 1e-9));
+      expect(next.scoreTop, 0);
+      expect(next.scoreBottom, 0);
+    },
+  );
+
+  test('ball is pushed toward the direction a moving paddle hits it with', () {
     final state = GameState(
       ballX: 0.5,
       ballY: 0.93,
@@ -92,11 +113,15 @@ void main() {
       playerPaddleX: 0.5,
     );
 
-    final next = advanceGame(state, 0.05, random: random);
+    final next = advanceGame(
+      state,
+      0.05,
+      playerDirection: MoveDirection.right,
+      random: random,
+    );
 
-    expect(next.ballVY, -1.0);
-    expect(next.scoreTop, 0);
-    expect(next.scoreBottom, 0);
+    expect(next.ballVY, -1.0); // no damping: the paddle was moving
+    expect(next.ballVX, greaterThan(0)); // pushed rightward with the paddle
   });
 
   test('opponent scores when the ball passes the player paddle unblocked', () {

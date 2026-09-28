@@ -44,39 +44,56 @@ class _FieldSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: AppColors.background,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Stack(
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final size = constraints.biggest;
-                final paddleWidthPx = size.width * state.paddleWidth;
-                return Stack(
-                  children: [
-                    _fieldPositioned(
-                      normalized: Offset(state.opponentPaddleX, kPaddleBandOffset),
-                      size: size,
-                      child: PaddleWidget(width: paddleWidthPx),
-                    ),
-                    _fieldPositioned(
-                      normalized: Offset(state.ballX, state.ballY),
-                      size: size,
-                      child: const BallWidget(),
-                    ),
-                    _fieldPositioned(
-                      normalized: Offset(state.playerPaddleX, 1 - kPaddleBandOffset),
-                      size: size,
-                      child: PaddleWidget(width: paddleWidthPx),
-                    ),
-                  ],
-                );
-              },
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: _ScoreTimerRow(state: state),
+          ),
+          // The play field gets its own space below the score/timer boxes,
+          // so the opponent paddle can never render underneath them.
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Stack(
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final size = constraints.biggest;
+                      final paddleWidthPx = size.width * state.paddleWidth;
+                      return Stack(
+                        children: [
+                          _fieldPositioned(
+                            normalized: Offset(
+                              state.opponentPaddleX,
+                              kPaddleBandOffset,
+                            ),
+                            size: size,
+                            child: PaddleWidget(width: paddleWidthPx),
+                          ),
+                          _fieldPositioned(
+                            normalized: Offset(state.ballX, state.ballY),
+                            size: size,
+                            child: const BallWidget(),
+                          ),
+                          _fieldPositioned(
+                            normalized: Offset(
+                              state.playerPaddleX,
+                              1 - kPaddleBandOffset,
+                            ),
+                            size: size,
+                            child: PaddleWidget(width: paddleWidthPx),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  if (state.matchOver) _MatchOverOverlay(state: state),
+                ],
+              ),
             ),
-            Positioned(top: 0, left: 0, right: 0, child: _ScoreBar(state: state)),
-            if (state.matchOver) _MatchOverOverlay(state: state),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -97,8 +114,8 @@ Widget _fieldPositioned({
   );
 }
 
-class _ScoreBar extends StatelessWidget {
-  const _ScoreBar({required this.state});
+class _ScoreTimerRow extends StatelessWidget {
+  const _ScoreTimerRow({required this.state});
 
   final GameState state;
 
@@ -106,19 +123,49 @@ class _ScoreBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final minutes = (state.remainingSeconds ~/ 60).toString().padLeft(2, '0');
     final seconds = (state.remainingSeconds % 60).toString().padLeft(2, '0');
-    const style = TextStyle(
-      color: AppColors.white,
-      fontSize: 24,
-      fontWeight: FontWeight.bold,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _StatBox(label: 'ADVERSÁRIO', value: '${state.scoreTop}'),
+        _StatBox(label: 'TEMPO', value: '$minutes:$seconds'),
+        _StatBox(label: 'VOCÊ', value: '${state.scoreBottom}'),
+      ],
     );
-    return Padding(
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  const _StatBox({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      decoration: const BoxDecoration(
+        color: AppColors.purple,
+        border: Border.fromBorderSide(
+          BorderSide(color: AppColors.purpleLight),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text('${state.scoreTop}', style: style),
-          Text('$minutes:$seconds', style: style.copyWith(fontSize: 18)),
-          Text('${state.scoreBottom}', style: style),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.white, fontSize: 11),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
