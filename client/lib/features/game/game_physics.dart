@@ -42,16 +42,24 @@ GameState resetBall(GameState state, Random random) {
 /// running [Ticker].
 ///
 /// With [restrictToOwnHalf], the ball is only simulated (and can only score)
-/// while it's on the player's own half (y >= 0.5) — the half where a real
-/// networked opponent is the authority just extrapolates the ball's last
-/// known trajectory instead of colliding it with anything, since the
-/// opponent's own device is the one resolving that side of the court.
+/// while it's on the player's own half — the half where a real networked
+/// opponent is the authority just extrapolates the ball's last known
+/// trajectory instead of colliding it with anything, since the opponent's
+/// own device is the one resolving that side of the court.
+///
+/// The center line (y == 0.5) is where a serve or re-serve always starts,
+/// and both peers compute it independently — without a tie-break, both
+/// would claim authority simultaneously and broadcast conflicting
+/// trajectories. [authoritativeAtCenter] resolves that: exactly one side
+/// (conventionally "bottom") should pass `true` and own the tie, while the
+/// other ("top") passes `false` and defers until it receives the serve.
 GameState advanceGame(
   GameState state,
   double dt, {
   MoveDirection? playerDirection,
   required Random random,
   bool restrictToOwnHalf = false,
+  bool authoritativeAtCenter = true,
 }) {
   if (state.matchOver || dt <= 0) return state;
 
@@ -64,9 +72,10 @@ GameState advanceGame(
   };
   playerX = (playerX + playerVelocity * dt).clamp(halfPaddle, 1 - halfPaddle);
 
-  if (restrictToOwnHalf && state.ballY < 0.5) {
+  final isOwnHalf = authoritativeAtCenter ? state.ballY >= 0.5 : state.ballY > 0.5;
+  if (restrictToOwnHalf && !isOwnHalf) {
     return state.copyWith(
-      ballX: state.ballX + state.ballVX * dt,
+      ballX: (state.ballX + state.ballVX * dt).clamp(0.0, 1.0),
       ballY: state.ballY + state.ballVY * dt,
       playerPaddleX: playerX,
     );

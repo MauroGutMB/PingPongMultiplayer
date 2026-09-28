@@ -28,8 +28,17 @@ class NetworkGameLoopController extends Notifier<GameState> {
   MoveDirection? _playerDirection;
   final Random _random = Random();
 
+  // Only one side may own the center-line tie (see advanceGame's
+  // authoritativeAtCenter doc) — otherwise both peers independently serve a
+  // random ball on every point and fight over it. "bottom" always owns it;
+  // "top" starts frozen and waits for bottom's first serve to arrive.
+  bool _authoritativeAtCenter = true;
+
   @override
   GameState build() {
+    final side = ref.watch(lobbyControllerProvider.select((s) => s.matchStart?.side));
+    _authoritativeAtCenter = side != 'top';
+
     final transport = ref.watch(lobbyTransportProvider);
     ref.onDispose(_disposeLoop);
 
@@ -46,7 +55,8 @@ class NetworkGameLoopController extends Notifier<GameState> {
     _ticker = Ticker(_onTick)..start();
     _matchTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tickClock());
 
-    return resetBall(const GameState(), _random);
+    const initial = GameState();
+    return _authoritativeAtCenter ? resetBall(initial, _random) : initial;
   }
 
   void setPlayerDirection(MoveDirection? direction) {
@@ -76,6 +86,9 @@ class NetworkGameLoopController extends Notifier<GameState> {
     }
   }
 
+  bool _isMine(double ballY) =>
+      _authoritativeAtCenter ? ballY >= 0.5 : ballY > 0.5;
+
   void _onTick(Duration elapsed) {
     final dtDuration = elapsed - _lastElapsed;
     final dt = dtDuration.inMicroseconds / Duration.microsecondsPerSecond;
@@ -91,6 +104,7 @@ class NetworkGameLoopController extends Notifier<GameState> {
       playerDirection: _playerDirection,
       random: _random,
       restrictToOwnHalf: true,
+      authoritativeAtCenter: _authoritativeAtCenter,
     );
 
     _sincePaddleBroadcast += dtDuration;
@@ -99,7 +113,7 @@ class NetworkGameLoopController extends Notifier<GameState> {
       _sync?.sendPaddle(state.playerPaddleX);
     }
 
-    if (state.ballY < 0.5) return; // opponent's half: not ours to report on
+    if (!_isMine(state.ballY)) return; // opponent's half: not ours to report on
 
     final scoredJustNow = state.scoreTop != scoreTopBefore;
     final bouncedJustNow = vyBefore != 0 && state.ballVY.sign != vyBefore.sign;

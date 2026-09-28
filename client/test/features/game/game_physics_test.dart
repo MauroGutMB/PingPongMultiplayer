@@ -240,6 +240,48 @@ void main() {
 
       expect(next.playerPaddleX, lessThan(0.5));
     });
+
+    test('extrapolation clamps the ball at the left/right walls', () {
+      // ballY < 0.5: the opponent's half, so this only extrapolates.
+      final state = GameState(ballX: 0.99, ballY: 0.4, ballVX: 5, ballVY: -1);
+
+      final next = advanceGame(
+        state,
+        1,
+        random: random,
+        restrictToOwnHalf: true,
+      );
+
+      expect(next.ballX, 1.0);
+    });
+
+    test(
+      'authoritativeAtCenter breaks the tie at the exact center: the owning '
+      'side treats y == 0.5 as its own, the other defers',
+      () {
+        final state = GameState(ballY: 0.5, ballVY: -1);
+
+        final owner = advanceGame(
+          state,
+          0.05,
+          random: random,
+          restrictToOwnHalf: true,
+        );
+        // Owns the center: collides/simulates as usual, moving off 0.5.
+        expect(owner.ballY, isNot(0.5));
+
+        final deferring = advanceGame(
+          state,
+          0.05,
+          random: random,
+          restrictToOwnHalf: true,
+          authoritativeAtCenter: false,
+        );
+        // Defers: this is just extrapolation, not collision handling, but
+        // the key point is both agree on who's driving — never both.
+        expect(deferring.ballY, closeTo(0.5 - 1 * 0.05, 1e-9));
+      },
+    );
   });
 
   group('applying opponent updates', () {
