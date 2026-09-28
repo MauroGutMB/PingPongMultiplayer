@@ -17,6 +17,12 @@ class AppColors {
 const _squareShape = RoundedRectangleBorder(borderRadius: BorderRadius.zero);
 const _squareBorderRadius = BorderRadius.zero;
 
+/// Thick black outline used across panels/menus for a chunky, pixel-art edge.
+const _pixelOutlineShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.zero,
+  side: BorderSide(color: Colors.black, width: 3),
+);
+
 final ThemeData appTheme = ThemeData(
   useMaterial3: true,
   brightness: Brightness.dark,
@@ -35,7 +41,7 @@ final ThemeData appTheme = ThemeData(
   ),
   dialogTheme: const DialogThemeData(
     backgroundColor: AppColors.purpleDark,
-    shape: _squareShape,
+    shape: _pixelOutlineShape,
     titleTextStyle: TextStyle(
       color: AppColors.white,
       fontSize: 18,
@@ -47,14 +53,14 @@ final ThemeData appTheme = ThemeData(
     tileColor: AppColors.purple,
     textColor: AppColors.white,
     iconColor: AppColors.white,
-    shape: _squareShape,
+    shape: _pixelOutlineShape,
   ),
   dividerTheme: const DividerThemeData(color: AppColors.purpleDark),
   filledButtonTheme: FilledButtonThemeData(
     style: FilledButton.styleFrom(
       backgroundColor: AppColors.purple,
       foregroundColor: AppColors.white,
-      shape: _squareShape,
+      shape: _pixelOutlineShape,
     ),
   ),
   textButtonTheme: TextButtonThemeData(
@@ -84,7 +90,7 @@ final ThemeData appTheme = ThemeData(
   snackBarTheme: const SnackBarThemeData(
     backgroundColor: AppColors.purple,
     contentTextStyle: TextStyle(color: AppColors.white),
-    shape: _squareShape,
+    shape: _pixelOutlineShape,
   ),
   progressIndicatorTheme: const ProgressIndicatorThemeData(
     color: AppColors.white,

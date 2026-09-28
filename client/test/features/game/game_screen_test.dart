@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pingpong_client/core/pixel_art.dart';
 import 'package:pingpong_client/core/theme.dart';
 import 'package:pingpong_client/features/game/game_screen.dart';
 import 'package:pingpong_client/features/game/widgets/ball_widget.dart';
@@ -59,29 +60,30 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('control buttons highlight while pressed and reset on release', (
+  testWidgets('control buttons invert their pixel bevel while pressed', (
     tester,
   ) async {
     await pumpGameScreen(tester);
 
     final leftButtonFinder = find.ancestor(
       of: find.byIcon(Icons.arrow_left),
-      matching: find.byType(Container),
+      matching: find.byType(PixelBevelBox),
     );
 
-    Color? colorOf(Finder finder) => tester.widget<Container>(finder).color;
+    bool pressedOf(Finder finder) =>
+        tester.widget<PixelBevelBox>(finder).pressed;
 
-    expect(colorOf(leftButtonFinder), AppColors.purple);
+    expect(pressedOf(leftButtonFinder), isFalse);
 
     final gesture = await tester.startGesture(
       tester.getCenter(leftButtonFinder),
     );
     await tester.pump();
-    expect(colorOf(leftButtonFinder), AppColors.purpleLight);
+    expect(pressedOf(leftButtonFinder), isTrue);
 
     await gesture.up();
     await tester.pump();
-    expect(colorOf(leftButtonFinder), AppColors.purple);
+    expect(pressedOf(leftButtonFinder), isFalse);
 
     await teardown(tester);
   });

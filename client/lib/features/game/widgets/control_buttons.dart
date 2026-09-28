@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/pixel_art.dart';
 import '../../../core/theme.dart';
 
 enum MoveDirection { left, right }
@@ -27,6 +28,7 @@ class _ControlButtonsState extends State<ControlButtons> {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: _ControlButton(
@@ -36,7 +38,7 @@ class _ControlButtonsState extends State<ControlButtons> {
             onPressEnd: () => _setPressed(null),
           ),
         ),
-        Container(width: 1, color: AppColors.purpleDark),
+        Container(width: 4, color: AppColors.background),
         Expanded(
           child: _ControlButton(
             icon: Icons.arrow_right,
@@ -69,10 +71,11 @@ class _ControlButton extends StatelessWidget {
       onTapDown: (_) => onPressStart(),
       onTapUp: (_) => onPressEnd(),
       onTapCancel: onPressEnd,
-      child: Container(
-        color: pressed ? AppColors.purpleLight : AppColors.purple,
-        alignment: Alignment.center,
-        child: Icon(icon, color: AppColors.white, size: 48),
+      child: PixelBevelBox(
+        color: AppColors.purple,
+        pixelSize: 5,
+        pressed: pressed,
+        child: Center(child: Icon(icon, color: AppColors.white, size: 48)),
       ),
     );
   }
