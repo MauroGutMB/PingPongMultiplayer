@@ -1,6 +1,4 @@
 /// Message types exchanged over the lobby/match WebSocket.
-///
-/// See specs/01-protocol.md for the authoritative description of each type.
 library;
 
 import 'dart:convert';

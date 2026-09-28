@@ -7,7 +7,7 @@ const _uuid = Uuid();
 
 /// Two matched players and their assigned sides. The server never inspects
 /// gameplay traffic beyond routing it to whichever of these two is not the
-/// sender — see specs/02-sync-rule.md for why physics stays client-side.
+/// sender; physics stays entirely client-side.
 class MatchRoom {
   MatchRoom({required this.matchId, required this.bottom, required this.top});
 
