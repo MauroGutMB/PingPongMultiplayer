@@ -1,8 +1,6 @@
-/// Message types exchanged over the lobby WebSocket.
+/// Message types exchanged over the lobby/match WebSocket.
 ///
-/// Only the presence/lobby subset (etapa 1 de specs/03-implementation-order.md)
-/// is implemented here. Invite and match-relay message types are added in
-/// etapa 2.
+/// See specs/01-protocol.md for the authoritative description of each type.
 library;
 
 import 'dart:convert';
@@ -10,7 +8,15 @@ import 'dart:convert';
 enum MessageType {
   hello('hello'),
   welcome('welcome'),
-  playerList('player_list');
+  playerList('player_list'),
+  inviteRequest('invite_request'),
+  inviteResponse('invite_response'),
+  matchStart('match_start'),
+  paddleState('paddle_state'),
+  ballState('ball_state'),
+  scoreUpdate('score_update'),
+  matchEnd('match_end'),
+  opponentDisconnected('opponent_disconnected');
 
   const MessageType(this.wireName);
 
@@ -73,6 +79,81 @@ class PlayerListMessage {
   Map<String, dynamic> toJson() => {
     'type': MessageType.playerList.wireName,
     'players': players.map((p) => p.toJson()).toList(),
+  };
+}
+
+/// client -> server: request to invite [toId] into a match.
+class InviteRequestMessage {
+  InviteRequestMessage({required this.toId});
+
+  factory InviteRequestMessage.fromJson(Map<String, dynamic> json) {
+    return InviteRequestMessage(toId: json['toId'] as String);
+  }
+
+  final String toId;
+}
+
+/// server -> client: notifies [toId] that [fromId] ([fromNickname]) invited them.
+class InviteRequestNotification {
+  InviteRequestNotification({required this.fromId, required this.fromNickname});
+
+  final String fromId;
+  final String fromNickname;
+
+  Map<String, dynamic> toJson() => {
+    'type': MessageType.inviteRequest.wireName,
+    'fromId': fromId,
+    'fromNickname': fromNickname,
+  };
+}
+
+/// client -> server: accept/reject the invite from [toId] (the original inviter).
+class InviteResponseMessage {
+  InviteResponseMessage({required this.toId, required this.accepted});
+
+  factory InviteResponseMessage.fromJson(Map<String, dynamic> json) {
+    return InviteResponseMessage(
+      toId: json['toId'] as String,
+      accepted: json['accepted'] as bool,
+    );
+  }
+
+  final String toId;
+  final bool accepted;
+}
+
+/// server -> client: forwards [fromId]'s accept/reject decision to the inviter.
+class InviteResponseNotification {
+  InviteResponseNotification({required this.fromId, required this.accepted});
+
+  final String fromId;
+  final bool accepted;
+
+  Map<String, dynamic> toJson() => {
+    'type': MessageType.inviteResponse.wireName,
+    'fromId': fromId,
+    'accepted': accepted,
+  };
+}
+
+/// server -> client: a match was created; tells the client which side it plays.
+class MatchStartMessage {
+  MatchStartMessage({required this.matchId, required this.side});
+
+  final String matchId;
+  final String side; // "top" | "bottom"
+
+  Map<String, dynamic> toJson() => {
+    'type': MessageType.matchStart.wireName,
+    'matchId': matchId,
+    'side': side,
+  };
+}
+
+/// server -> client: the opponent's socket dropped mid-match.
+class OpponentDisconnectedMessage {
+  Map<String, dynamic> toJson() => {
+    'type': MessageType.opponentDisconnected.wireName,
   };
 }
 
