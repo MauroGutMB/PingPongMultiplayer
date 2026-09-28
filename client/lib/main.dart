@@ -14,7 +14,7 @@ class PingPongApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PingPong Multiplayer',
+      title: 'IPing Pong',
       themeMode: ThemeMode.dark,
       darkTheme: appTheme,
       theme: appTheme,
