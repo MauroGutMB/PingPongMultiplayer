@@ -55,7 +55,7 @@ Future<void> _enterLobby(
   transport.receive({
     'type': 'player_list',
     'players': [
-      {'id': 'me', 'nickname': 'Alice'},
+      {'id': 'me', 'nickname': 'Alice', 'ip': '127.0.0.1'},
       ...players,
     ],
   });
@@ -84,7 +84,7 @@ void main() {
       tester,
       transport,
       players: [
-        {'id': 'bob', 'nickname': 'Bob'},
+        {'id': 'bob', 'nickname': 'Bob', 'ip': '10.0.0.2'},
       ],
     );
 
@@ -92,6 +92,7 @@ void main() {
     expect(transport.sent.single, {'type': 'hello', 'nickname': 'Alice'});
     expect(find.text('Bob'), findsOneWidget);
     expect(find.text('Alice'), findsNothing);
+    expect(find.text('10.0.0.2'), findsOneWidget);
   });
 
   testWidgets('tapping a player confirms and sends an invite_request', (
@@ -102,7 +103,7 @@ void main() {
       tester,
       transport,
       players: [
-        {'id': 'bob', 'nickname': 'Bob'},
+        {'id': 'bob', 'nickname': 'Bob', 'ip': '10.0.0.2'},
       ],
     );
 
@@ -135,7 +136,7 @@ void main() {
       tester,
       transport,
       players: [
-        {'id': 'bob', 'nickname': 'Bob'},
+        {'id': 'bob', 'nickname': 'Bob', 'ip': '10.0.0.2'},
       ],
     );
 

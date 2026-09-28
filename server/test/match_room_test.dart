@@ -12,6 +12,7 @@ class _Player {
   late final connection = PlayerConnection(
     id: id,
     nickname: nickname,
+    ip: '127.0.0.1',
     sendJson: inbox.add,
   );
 }

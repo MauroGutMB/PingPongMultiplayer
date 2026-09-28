@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:uuid/uuid.dart';
@@ -12,12 +14,28 @@ import 'package:pingpong_server/protocol.dart';
 
 const _uuid = Uuid();
 
+// shelf_web_socket's onConnection callback only gets the channel, not the
+// originating Request — so the client's IP is threaded through via a Zone
+// value set on the request handler that wraps it, one per HTTP upgrade.
+const _remoteIpKey = #remoteIp;
+
 void main(List<String> args) async {
   final lobby = Lobby();
   final matchService = MatchService();
-  final handler = webSocketHandler((WebSocketChannel channel, String? _) {
-    _handleConnection(channel, lobby, matchService);
+  final wsHandler = webSocketHandler((WebSocketChannel channel, String? _) {
+    final ip = Zone.current[_remoteIpKey] as String? ?? 'desconhecido';
+    _handleConnection(channel, lobby, matchService, ip);
   });
+
+  FutureOr<Response> handler(Request request) {
+    final connectionInfo =
+        request.context['shelf.io.connection_info'] as HttpConnectionInfo?;
+    final ip = connectionInfo?.remoteAddress.address;
+    return runZoned(
+      () => wsHandler(request),
+      zoneValues: {_remoteIpKey: ip},
+    );
+  }
 
   final port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 8080;
   final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);
@@ -28,6 +46,7 @@ void _handleConnection(
   WebSocketChannel channel,
   Lobby lobby,
   MatchService matchService,
+  String remoteIp,
 ) {
   String? playerId;
 
@@ -42,6 +61,7 @@ void _handleConnection(
         final connection = PlayerConnection(
           id: playerId!,
           nickname: hello.nickname,
+          ip: remoteIp,
           sendJson: (message) => channel.sink.add(jsonEncode(message)),
         );
         lobby.register(connection);

@@ -131,6 +131,10 @@ class _PlayerListView extends StatelessWidget {
         return ListTile(
           leading: const Icon(Icons.sports_tennis),
           title: Text(player.nickname),
+          subtitle: Text(
+            player.ip,
+            style: const TextStyle(fontSize: 11, color: Colors.white70),
+          ),
           onTap: () => onTap(player),
         );
       },

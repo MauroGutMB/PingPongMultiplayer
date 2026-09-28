@@ -8,11 +8,13 @@ class PlayerConnection {
   PlayerConnection({
     required this.id,
     required this.nickname,
+    required this.ip,
     required void Function(Map<String, dynamic>) sendJson,
   }) : _sendJson = sendJson;
 
   final String id;
   final String nickname;
+  final String ip;
   final void Function(Map<String, dynamic>) _sendJson;
 
   void send(Map<String, dynamic> message) => _sendJson(message);
@@ -38,7 +40,7 @@ class Lobby {
   void _broadcastPlayerList() {
     final message = PlayerListMessage(
       players: _players.values
-          .map((p) => PlayerInfo(id: p.id, nickname: p.nickname))
+          .map((p) => PlayerInfo(id: p.id, nickname: p.nickname, ip: p.ip))
           .toList(),
     ).toJson();
     for (final player in _players.values) {
