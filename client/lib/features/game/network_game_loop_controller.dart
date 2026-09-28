@@ -13,6 +13,14 @@ import 'widgets/control_buttons.dart' show MoveDirection;
 const _paddleBroadcastInterval = Duration(milliseconds: 50);
 const _ballBroadcastInterval = Duration(milliseconds: 50);
 
+/// How long after a serve the authoritative side keeps broadcasting the ball
+/// even if it's nominally crossed to the opponent's half. The opponent's
+/// screen may still be finishing its own transition into the match (and
+/// hasn't subscribed to the socket yet) when the serve first goes out, so a
+/// single message can get lost with nobody at fault; repeating it for a
+/// short window makes that loss harmless instead of an infinite freeze.
+const _serveGracePeriod = Duration(milliseconds: 800);
+
 /// Same game loop as [GameLoopController], but for a real match: the ball is
 /// only simulated on our own half (the other half is authoritative on the
 /// opponent's device), our paddle and ball are broadcast over the socket
@@ -25,6 +33,7 @@ class NetworkGameLoopController extends Notifier<GameState> {
   Duration _lastElapsed = Duration.zero;
   Duration _sincePaddleBroadcast = Duration.zero;
   Duration _sinceBallBroadcast = Duration.zero;
+  Duration _matchAge = Duration.zero;
   MoveDirection? _playerDirection;
   final Random _random = Random();
 
@@ -56,7 +65,16 @@ class NetworkGameLoopController extends Notifier<GameState> {
     _matchTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tickClock());
 
     const initial = GameState();
-    return _authoritativeAtCenter ? resetBall(initial, _random) : initial;
+    if (!_authoritativeAtCenter) return initial;
+
+    final serve = resetBall(initial, _random);
+    // Broadcast the opening serve unconditionally, right now — not on the
+    // next tick. If the random direction happens to head straight for the
+    // opponent's half, the very first tick's own send-check would already
+    // see us as no longer authoritative and skip sending, leaving the other
+    // side waiting forever for a serve that never arrives.
+    _sync!.sendBall(serve.ballX, serve.ballY, serve.ballVX, serve.ballVY);
+    return serve;
   }
 
   void setPlayerDirection(MoveDirection? direction) {
@@ -113,7 +131,16 @@ class NetworkGameLoopController extends Notifier<GameState> {
       _sync?.sendPaddle(state.playerPaddleX);
     }
 
-    if (!_isMine(state.ballY)) return; // opponent's half: not ours to report on
+    _matchAge += dtDuration;
+    // Only the side that owns the center tie (the server of the opening
+    // point) gets the grace-period redundancy — the other side has nothing
+    // real to report until it actually receives that serve, and must never
+    // broadcast its own still-uninitialized ball back at the server.
+    final inServeGracePeriod =
+        _authoritativeAtCenter && _matchAge < _serveGracePeriod;
+    if (!inServeGracePeriod && !_isMine(state.ballY)) {
+      return; // opponent's half: not ours to report on
+    }
 
     final scoredJustNow = state.scoreTop != scoreTopBefore;
     final bouncedJustNow = vyBefore != 0 && state.ballVY.sign != vyBefore.sign;
