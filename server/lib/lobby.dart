@@ -37,14 +37,26 @@ class Lobby {
 
   PlayerConnection? operator [](String playerId) => _players[playerId];
 
+  /// Re-sends the current roster to a single player — used for a manual
+  /// pull-to-refresh, since normally the list only reaches clients via the
+  /// broadcast this class sends on every join/leave.
+  void sendPlayerListTo(String playerId) {
+    final player = _players[playerId];
+    if (player != null) player.send(_playerListMessage());
+  }
+
   void _broadcastPlayerList() {
-    final message = PlayerListMessage(
+    final message = _playerListMessage();
+    for (final player in _players.values) {
+      player.send(message);
+    }
+  }
+
+  Map<String, dynamic> _playerListMessage() {
+    return PlayerListMessage(
       players: _players.values
           .map((p) => PlayerInfo(id: p.id, nickname: p.nickname, ip: p.ip))
           .toList(),
     ).toJson();
-    for (final player in _players.values) {
-      player.send(message);
-    }
   }
 }

@@ -7,6 +7,7 @@ enum MessageType {
   hello('hello'),
   welcome('welcome'),
   playerList('player_list'),
+  requestPlayerList('request_player_list'),
   inviteRequest('invite_request'),
   inviteResponse('invite_response'),
   matchStart('match_start'),

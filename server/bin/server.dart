@@ -73,6 +73,8 @@ void _handleConnection(
       if (currentId == null) return; // must send hello first
 
       switch (envelope.type) {
+        case MessageType.requestPlayerList:
+          lobby.sendPlayerListTo(currentId);
         case MessageType.inviteRequest:
           matchService.handleInviteRequest(lobby, currentId, envelope.body);
         case MessageType.inviteResponse:
