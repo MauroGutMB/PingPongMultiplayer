@@ -16,6 +16,7 @@ class GameState {
     this.scoreBottom = 0,
     this.remainingSeconds = kMatchDurationSeconds,
     this.matchOver = false,
+    this.opponentLeft = false,
   });
 
   final double ballX;
@@ -30,6 +31,10 @@ class GameState {
   final int remainingSeconds;
   final bool matchOver;
 
+  /// Only meaningful for networked matches: the opponent's socket dropped
+  /// (or they intentionally left) before the match timer ran out.
+  final bool opponentLeft;
+
   GameState copyWith({
     double? ballX,
     double? ballY,
@@ -41,6 +46,7 @@ class GameState {
     int? scoreBottom,
     int? remainingSeconds,
     bool? matchOver,
+    bool? opponentLeft,
   }) {
     return GameState(
       ballX: ballX ?? this.ballX,
@@ -54,6 +60,7 @@ class GameState {
       scoreBottom: scoreBottom ?? this.scoreBottom,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       matchOver: matchOver ?? this.matchOver,
+      opponentLeft: opponentLeft ?? this.opponentLeft,
     );
   }
 }

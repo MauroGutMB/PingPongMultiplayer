@@ -3,7 +3,8 @@ import 'dart:async';
 import '../../core/websocket_service.dart';
 
 /// Sends/receives the in-match messages the server relays verbatim between
-/// the two matched sockets (paddle_state, ball_state, score_update).
+/// the two matched sockets (paddle_state, ball_state, score_update), plus
+/// the opponent_disconnected notification and our own leave_match request.
 class GameSyncService {
   GameSyncService(this._transport);
 
@@ -14,6 +15,7 @@ class GameSyncService {
     required void Function(double x) onOpponentPaddle,
     required void Function(double x, double y, double vx, double vy) onOpponentBall,
     required void Function() onOpponentScored,
+    required void Function() onOpponentDisconnected,
   }) {
     _subscription = _transport.messages.listen((message) {
       switch (message['type']) {
@@ -28,6 +30,8 @@ class GameSyncService {
           );
         case 'score_update':
           onOpponentScored();
+        case 'opponent_disconnected':
+          onOpponentDisconnected();
       }
     });
   }
@@ -42,6 +46,12 @@ class GameSyncService {
 
   void sendScoreUpdate() {
     _transport.send({'type': 'score_update'});
+  }
+
+  /// Tells the server we're intentionally leaving an in-progress match, so it
+  /// can notify the opponent and put us back in the lobby.
+  void sendLeaveMatch() {
+    _transport.send({'type': 'leave_match'});
   }
 
   void dispose() {

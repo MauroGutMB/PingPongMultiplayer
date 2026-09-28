@@ -272,5 +272,14 @@ void main() {
       expect(next.scoreBottom, 3);
       expect(next.scoreTop, 5);
     });
+
+    test('applyOpponentDisconnected ends the match', () {
+      const state = GameState();
+
+      final next = applyOpponentDisconnected(state);
+
+      expect(next.opponentLeft, isTrue);
+      expect(next.matchOver, isTrue);
+    });
   });
 }

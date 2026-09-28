@@ -39,6 +39,7 @@ class NetworkGameLoopController extends Notifier<GameState> {
         onOpponentBall: (x, y, vx, vy) =>
             state = applyOpponentBall(state, x: x, y: y, vx: vx, vy: vy),
         onOpponentScored: () => state = applyOpponentScored(state),
+        onOpponentDisconnected: _onOpponentDisconnected,
       );
 
     _lastElapsed = Duration.zero;
@@ -50,6 +51,18 @@ class NetworkGameLoopController extends Notifier<GameState> {
 
   void setPlayerDirection(MoveDirection? direction) {
     _playerDirection = direction;
+  }
+
+  /// Tells the server we're backing out of the match (e.g. after tapping
+  /// "Voltar" on the match-over screen, or leaving mid-match).
+  void leaveMatch() {
+    _sync?.sendLeaveMatch();
+  }
+
+  void _onOpponentDisconnected() {
+    if (state.matchOver) return;
+    state = applyOpponentDisconnected(state);
+    _ticker?.stop();
   }
 
   void _tickClock() {

@@ -24,31 +24,38 @@ class FakeTransport implements LobbyTransport {
 }
 
 void main() {
-  test('dispatches incoming paddle_state/ball_state/score_update to the right callback', () async {
-    final transport = FakeTransport();
-    final sync = GameSyncService(transport);
+  test(
+    'dispatches incoming paddle_state/ball_state/score_update/opponent_disconnected to the right callback',
+    () async {
+      final transport = FakeTransport();
+      final sync = GameSyncService(transport);
 
-    double? paddleX;
-    (double, double, double, double)? ball;
-    var scoredCount = 0;
+      double? paddleX;
+      (double, double, double, double)? ball;
+      var scoredCount = 0;
+      var disconnectedCount = 0;
 
-    sync.listen(
-      onOpponentPaddle: (x) => paddleX = x,
-      onOpponentBall: (x, y, vx, vy) => ball = (x, y, vx, vy),
-      onOpponentScored: () => scoredCount++,
-    );
+      sync.listen(
+        onOpponentPaddle: (x) => paddleX = x,
+        onOpponentBall: (x, y, vx, vy) => ball = (x, y, vx, vy),
+        onOpponentScored: () => scoredCount++,
+        onOpponentDisconnected: () => disconnectedCount++,
+      );
 
-    transport.receive({'type': 'paddle_state', 'x': 0.42});
-    transport.receive({'type': 'ball_state', 'x': 0.1, 'y': 0.2, 'vx': 0.3, 'vy': 0.4});
-    transport.receive({'type': 'score_update'});
-    await Future<void>.delayed(Duration.zero);
+      transport.receive({'type': 'paddle_state', 'x': 0.42});
+      transport.receive({'type': 'ball_state', 'x': 0.1, 'y': 0.2, 'vx': 0.3, 'vy': 0.4});
+      transport.receive({'type': 'score_update'});
+      transport.receive({'type': 'opponent_disconnected'});
+      await Future<void>.delayed(Duration.zero);
 
-    expect(paddleX, 0.42);
-    expect(ball, (0.1, 0.2, 0.3, 0.4));
-    expect(scoredCount, 1);
+      expect(paddleX, 0.42);
+      expect(ball, (0.1, 0.2, 0.3, 0.4));
+      expect(scoredCount, 1);
+      expect(disconnectedCount, 1);
 
-    sync.dispose();
-  });
+      sync.dispose();
+    },
+  );
 
   test('ignores unrelated message types', () async {
     final transport = FakeTransport();
@@ -59,6 +66,7 @@ void main() {
       onOpponentPaddle: (_) => called = true,
       onOpponentBall: (_, _, _, _) => called = true,
       onOpponentScored: () => called = true,
+      onOpponentDisconnected: () => called = true,
     );
 
     transport.receive({'type': 'player_list', 'players': []});
@@ -69,20 +77,25 @@ void main() {
     sync.dispose();
   });
 
-  test('sendPaddle/sendBall/sendScoreUpdate produce the expected wire messages', () {
-    final transport = FakeTransport();
-    final sync = GameSyncService(transport);
+  test(
+    'sendPaddle/sendBall/sendScoreUpdate/sendLeaveMatch produce the expected wire messages',
+    () {
+      final transport = FakeTransport();
+      final sync = GameSyncService(transport);
 
-    sync.sendPaddle(0.5);
-    sync.sendBall(0.1, 0.2, 0.3, 0.4);
-    sync.sendScoreUpdate();
+      sync.sendPaddle(0.5);
+      sync.sendBall(0.1, 0.2, 0.3, 0.4);
+      sync.sendScoreUpdate();
+      sync.sendLeaveMatch();
 
-    expect(transport.sent, [
-      {'type': 'paddle_state', 'x': 0.5},
-      {'type': 'ball_state', 'x': 0.1, 'y': 0.2, 'vx': 0.3, 'vy': 0.4},
-      {'type': 'score_update'},
-    ]);
+      expect(transport.sent, [
+        {'type': 'paddle_state', 'x': 0.5},
+        {'type': 'ball_state', 'x': 0.1, 'y': 0.2, 'vx': 0.3, 'vy': 0.4},
+        {'type': 'score_update'},
+        {'type': 'leave_match'},
+      ]);
 
-    sync.dispose();
-  });
+      sync.dispose();
+    },
+  );
 }

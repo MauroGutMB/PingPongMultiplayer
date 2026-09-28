@@ -92,4 +92,25 @@ void main() {
     expect(matchService.isInMatch(alice.id), isFalse);
     expect(matchService.isInMatch(bob.id), isFalse);
   });
+
+  test(
+    'leaveMatch tears down the room, notifies the opponent, and returns the leaver\'s own connection',
+    () {
+      matchService.handleInviteResponse(lobby, bob.id, {'toId': alice.id, 'accepted': true});
+      alice.inbox.clear();
+      bob.inbox.clear();
+
+      final leaver = matchService.leaveMatch(alice.id);
+
+      expect(leaver, same(alice.connection));
+      expect(bob.inbox.single, {'type': 'opponent_disconnected'});
+      expect(matchService.isInMatch(alice.id), isFalse);
+      expect(matchService.isInMatch(bob.id), isFalse);
+    },
+  );
+
+  test('leaveMatch is a no-op for a player who is not in a match', () {
+    expect(matchService.leaveMatch(alice.id), isNull);
+    expect(alice.inbox, isEmpty);
+  });
 }

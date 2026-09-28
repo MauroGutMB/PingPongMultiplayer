@@ -14,7 +14,8 @@ enum MessageType {
   ballState('ball_state'),
   scoreUpdate('score_update'),
   matchEnd('match_end'),
-  opponentDisconnected('opponent_disconnected');
+  opponentDisconnected('opponent_disconnected'),
+  leaveMatch('leave_match');
 
   const MessageType(this.wireName);
 

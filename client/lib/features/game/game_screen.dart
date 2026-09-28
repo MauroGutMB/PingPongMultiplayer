@@ -56,7 +56,12 @@ class NetworkGameScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(networkGameLoopProvider);
     final controller = ref.read(networkGameLoopProvider.notifier);
-    return GameView(state: state, onDirectionChanged: controller.setPlayerDirection);
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) controller.leaveMatch();
+      },
+      child: GameView(state: state, onDirectionChanged: controller.setPlayerDirection),
+    );
   }
 }
 
@@ -211,9 +216,10 @@ class _MatchOverOverlay extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Fim de partida',
-                style: TextStyle(color: AppColors.white, fontSize: 22),
+              Text(
+                state.opponentLeft ? 'O adversário desconectou' : 'Fim de partida',
+                style: const TextStyle(color: AppColors.white, fontSize: 22),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(

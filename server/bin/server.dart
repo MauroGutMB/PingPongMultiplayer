@@ -62,6 +62,9 @@ void _handleConnection(
         case MessageType.scoreUpdate:
         case MessageType.matchEnd:
           matchService.relay(currentId, envelope.body);
+        case MessageType.leaveMatch:
+          final connection = matchService.leaveMatch(currentId);
+          if (connection != null) lobby.register(connection);
         case MessageType.hello:
         case MessageType.welcome:
         case MessageType.playerList:

@@ -75,7 +75,7 @@ class MatchService {
   }
 
   /// Forwards an in-match message verbatim to the sender's opponent.
-  /// Used for paddle_state, ball_state, score_update, match_end.
+  /// Used for paddle_state, ball_state and score_update.
   void relay(String fromId, Map<String, dynamic> body) {
     final room = _roomByPlayer[fromId];
     room?.other(fromId)?.send(body);
@@ -83,12 +83,27 @@ class MatchService {
 
   /// Cleans up the match room and notifies the remaining player, if any.
   void handleDisconnect(String playerId) {
+    _teardownRoom(playerId);
+  }
+
+  /// Called when a player intentionally leaves an in-progress match (as
+  /// opposed to a real disconnect). Tears down the room and notifies the
+  /// opponent the same way [handleDisconnect] does, then returns the leaving
+  /// player's own connection so the caller can put them back in the lobby.
+  PlayerConnection? leaveMatch(String playerId) {
+    final room = _teardownRoom(playerId);
+    if (room == null) return null;
+    return playerId == room.bottom.id ? room.bottom : room.top;
+  }
+
+  MatchRoom? _teardownRoom(String playerId) {
     final room = _roomByPlayer.remove(playerId);
-    if (room == null) return;
+    if (room == null) return null;
     final other = room.other(playerId);
     if (other != null) {
       _roomByPlayer.remove(other.id);
       other.send(OpponentDisconnectedMessage().toJson());
     }
+    return room;
   }
 }

@@ -150,3 +150,8 @@ GameState applyOpponentBall(
 GameState applyOpponentScored(GameState state) {
   return state.copyWith(scoreBottom: state.scoreBottom + 1);
 }
+
+/// Applies an incoming opponent_disconnected: the match can't continue.
+GameState applyOpponentDisconnected(GameState state) {
+  return state.copyWith(opponentLeft: true, matchOver: true);
+}
