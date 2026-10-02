@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme.dart';
-import 'features/connect/connect_screen.dart';
+import 'features/lobby/lobby_screen.dart';
 
 void main() {
   // Flutter's default release-mode error widget renders as a blank grey box,
@@ -34,7 +34,7 @@ class PingPongApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       darkTheme: appTheme,
       theme: appTheme,
-      home: const ConnectScreen(),
+      home: const LobbyScreen(),
     );
   }
 }

@@ -6,8 +6,9 @@ import '../../core/config.dart';
 import '../../core/protocol.dart';
 import '../../core/websocket_service.dart';
 
-/// Set by the connect screen before the lobby is ever shown — automatic
-/// (gist) or manual URL entry both funnel through here.
+/// Lets the nickname prompt point at a different server than
+/// [kDefaultServerUrl] (e.g. localhost during development), without a
+/// rebuild.
 class ServerUrlOverride extends Notifier<String?> {
   @override
   String? build() => null;
@@ -193,6 +194,12 @@ class LobbyController extends Notifier<LobbyState> {
 
   void acknowledgeRejection() {
     state = state.copyWith(inviteRejected: false, inviteTargetLeft: false);
+  }
+
+  /// Lets the nickname prompt show up again after a failed connection
+  /// attempt, instead of leaving the user stuck on the error screen.
+  void retry() {
+    state = const LobbyState();
   }
 }
 

@@ -7,9 +7,14 @@ import '../../core/theme.dart';
 import '../lobby/lobby_provider.dart';
 import '../lobby/lobby_screen.dart';
 
+// UNUSED since the gist-based auto-discovery flow was replaced by a fixed
+// Render URL (see core/config.dart) — this whole file is dead code kept
+// only because it couldn't be deleted in the session that retired it.
+// Safe to `rm` this file, gist_config_service.dart, and their tests.
+
 /// Overridable in tests to avoid a real HTTP call.
 final gistConfigServiceProvider = Provider<GistConfigService>((ref) {
-  return GistConfigService(kGistConfigUrl);
+  return GistConfigService('https://unused.invalid');
 });
 
 /// First screen the app shows: pick how to find the server before the lobby

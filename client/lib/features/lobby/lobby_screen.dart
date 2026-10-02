@@ -42,6 +42,48 @@ class LobbyScreen extends ConsumerWidget {
       return _NicknamePrompt(onSubmit: controller.connect);
     }
 
+    if (state.status == LobbyStatus.connecting) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Aguardando resposta do servidor...'),
+              SizedBox(height: 8),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'Pode demorar um pouco se o servidor estiver inativo no momento.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (state.status == LobbyStatus.error) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Erro ao conectar ao servidor.'),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: controller.retry,
+                child: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Jogadores online'),
@@ -55,33 +97,27 @@ class LobbyScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: switch (state.status) {
-        LobbyStatus.connecting => const Center(child: CircularProgressIndicator()),
-        LobbyStatus.error => const Center(
-          child: Text('Erro ao conectar ao servidor.'),
+      body: RefreshIndicator(
+        onRefresh: controller.refreshPlayers,
+        child: _PlayerListView(
+          players: state.otherPlayers,
+          onTap: (player) => showSendInviteFlow(context, player, controller),
         ),
-        _ => RefreshIndicator(
-          onRefresh: controller.refreshPlayers,
-          child: _PlayerListView(
-            players: state.otherPlayers,
-            onTap: (player) => showSendInviteFlow(context, player, controller),
-          ),
-        ),
-      },
+      ),
     );
   }
 }
 
-class _NicknamePrompt extends StatefulWidget {
+class _NicknamePrompt extends ConsumerStatefulWidget {
   const _NicknamePrompt({required this.onSubmit});
 
   final ValueChanged<String> onSubmit;
 
   @override
-  State<_NicknamePrompt> createState() => _NicknamePromptState();
+  ConsumerState<_NicknamePrompt> createState() => _NicknamePromptState();
 }
 
-class _NicknamePromptState extends State<_NicknamePrompt> {
+class _NicknamePromptState extends ConsumerState<_NicknamePrompt> {
   final _controller = TextEditingController();
 
   @override
@@ -101,6 +137,11 @@ class _NicknamePromptState extends State<_NicknamePrompt> {
                 onPressed: () => _submit(_controller.text),
                 child: const Text('Entrar'),
               ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => _showManualServerDialog(context),
+                child: const Text('Usar outro servidor'),
+              ),
             ],
           ),
         ),
@@ -112,6 +153,36 @@ class _NicknamePromptState extends State<_NicknamePrompt> {
     final nickname = value.trim();
     if (nickname.isEmpty) return;
     widget.onSubmit(nickname);
+  }
+
+  Future<void> _showManualServerDialog(BuildContext context) async {
+    final override = ref.read(serverUrlOverrideProvider);
+    final urlController = TextEditingController(
+      text: override ?? ref.read(serverUrlProvider),
+    );
+    final url = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('URL do servidor'),
+        content: TextField(
+          controller: urlController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'ws://192.168.0.10:8080'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, urlController.text.trim()),
+            child: const Text('Usar'),
+          ),
+        ],
+      ),
+    );
+    if (url == null || url.isEmpty) return;
+    ref.read(serverUrlOverrideProvider.notifier).set(url);
   }
 
   @override
