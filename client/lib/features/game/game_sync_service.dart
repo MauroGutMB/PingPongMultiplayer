@@ -3,8 +3,9 @@ import 'dart:async';
 import '../../core/websocket_service.dart';
 
 /// Sends/receives the in-match messages the server relays verbatim between
-/// the two matched sockets (paddle_state, ball_state, score_update), plus
-/// the opponent_disconnected notification and our own leave_match request.
+/// the two matched sockets (paddle_state, ball_state, score_update,
+/// match_end), plus the opponent_disconnected and spectator_count
+/// notifications and our own leave_match request.
 class GameSyncService {
   GameSyncService(this._transport);
 
@@ -16,6 +17,7 @@ class GameSyncService {
     required void Function(double x, double y, double vx, double vy) onOpponentBall,
     required void Function() onOpponentScored,
     required void Function() onOpponentDisconnected,
+    void Function(int count)? onSpectatorCount,
   }) {
     _subscription = _transport.messages.listen((message) {
       switch (message['type']) {
@@ -32,6 +34,8 @@ class GameSyncService {
           onOpponentScored();
         case 'opponent_disconnected':
           onOpponentDisconnected();
+        case 'spectator_count':
+          onSpectatorCount?.call(message['count'] as int);
       }
     });
   }
@@ -44,8 +48,28 @@ class GameSyncService {
     _transport.send({'type': 'ball_state', 'x': x, 'y': y, 'vx': vx, 'vy': vy});
   }
 
-  void sendScoreUpdate() {
-    _transport.send({'type': 'score_update'});
+  /// [scoreBottom]/[scoreTop] are the absolute, side-labelled scores (not
+  /// "mine"/"theirs") computed by the caller — see
+  /// NetworkGameLoopController._neutralScoreBottom/_neutralScoreTop — so that
+  /// anyone reading the relay without the sender's own egocentric context
+  /// (the server, caching it for spectators; a spectator's own client) can
+  /// use them directly without first having to know who sent the message.
+  void sendScoreUpdate({required int scoreBottom, required int scoreTop}) {
+    _transport.send({
+      'type': 'score_update',
+      'scoreBottom': scoreBottom,
+      'scoreTop': scoreTop,
+    });
+  }
+
+  /// Tells the server (and, through it, the opponent and any spectators) that
+  /// our local clock ran out and the match is over, with the final score.
+  void sendMatchEnd({required int scoreBottom, required int scoreTop}) {
+    _transport.send({
+      'type': 'match_end',
+      'scoreBottom': scoreBottom,
+      'scoreTop': scoreTop,
+    });
   }
 
   /// Tells the server we're intentionally leaving an in-progress match, so it

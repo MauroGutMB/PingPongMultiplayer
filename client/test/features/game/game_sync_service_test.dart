@@ -78,24 +78,47 @@ void main() {
   });
 
   test(
-    'sendPaddle/sendBall/sendScoreUpdate/sendLeaveMatch produce the expected wire messages',
+    'sendPaddle/sendBall/sendScoreUpdate/sendMatchEnd/sendLeaveMatch produce the expected wire messages',
     () {
       final transport = FakeTransport();
       final sync = GameSyncService(transport);
 
       sync.sendPaddle(0.5);
       sync.sendBall(0.1, 0.2, 0.3, 0.4);
-      sync.sendScoreUpdate();
+      sync.sendScoreUpdate(scoreBottom: 2, scoreTop: 1);
+      sync.sendMatchEnd(scoreBottom: 3, scoreTop: 1);
       sync.sendLeaveMatch();
 
       expect(transport.sent, [
         {'type': 'paddle_state', 'x': 0.5},
         {'type': 'ball_state', 'x': 0.1, 'y': 0.2, 'vx': 0.3, 'vy': 0.4},
-        {'type': 'score_update'},
+        {'type': 'score_update', 'scoreBottom': 2, 'scoreTop': 1},
+        {'type': 'match_end', 'scoreBottom': 3, 'scoreTop': 1},
         {'type': 'leave_match'},
       ]);
 
       sync.dispose();
     },
   );
+
+  test('dispatches spectator_count to its callback', () async {
+    final transport = FakeTransport();
+    final sync = GameSyncService(transport);
+    int? count;
+
+    sync.listen(
+      onOpponentPaddle: (_) {},
+      onOpponentBall: (_, _, _, _) {},
+      onOpponentScored: () {},
+      onOpponentDisconnected: () {},
+      onSpectatorCount: (c) => count = c,
+    );
+
+    transport.receive({'type': 'spectator_count', 'matchId': 'm', 'count': 3});
+    await Future<void>.delayed(Duration.zero);
+
+    expect(count, 3);
+
+    sync.dispose();
+  });
 }

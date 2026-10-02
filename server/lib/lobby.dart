@@ -22,7 +22,19 @@ class PlayerConnection {
 
 /// Tracks online players and broadcasts presence changes to everyone.
 class Lobby {
+  Lobby({bool Function(String playerId)? isPending})
+    : _isPending = isPending ?? ((_) => false);
+
+  /// Reports whether a player has a pending invite (sent or received), so the
+  /// broadcast roster can mark them unavailable. Defaults to "never pending"
+  /// so existing callers that build a bare `Lobby()` keep working unchanged.
+  final bool Function(String playerId) _isPending;
+
   final Map<String, PlayerConnection> _players = {};
+
+  /// Every currently connected player, for broadcasts that aren't tied to a
+  /// membership change (e.g. the match list, which lives in [MatchService]).
+  Iterable<PlayerConnection> get all => _players.values;
 
   void register(PlayerConnection connection) {
     _players[connection.id] = connection;
@@ -45,6 +57,11 @@ class Lobby {
     if (player != null) player.send(_playerListMessage());
   }
 
+  /// Re-broadcasts the roster with no membership change — used when a
+  /// per-player attribute it exposes (currently just [PlayerInfo.pendingInvite])
+  /// changes without anyone joining or leaving.
+  void refreshPresence() => _broadcastPlayerList();
+
   void _broadcastPlayerList() {
     final message = _playerListMessage();
     for (final player in _players.values) {
@@ -55,7 +72,14 @@ class Lobby {
   Map<String, dynamic> _playerListMessage() {
     return PlayerListMessage(
       players: _players.values
-          .map((p) => PlayerInfo(id: p.id, nickname: p.nickname, ip: p.ip))
+          .map(
+            (p) => PlayerInfo(
+              id: p.id,
+              nickname: p.nickname,
+              ip: p.ip,
+              pendingInvite: _isPending(p.id),
+            ),
+          )
           .toList(),
     ).toJson();
   }

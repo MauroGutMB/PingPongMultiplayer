@@ -26,8 +26,8 @@ void main(List<String> args) {
   // Render that would mean every connected player getting dropped at once.
   runZonedGuarded(
     () async {
-      final lobby = Lobby();
       final matchService = MatchService();
+      final lobby = Lobby(isPending: matchService.hasPendingInvite);
       final wsHandler = webSocketHandler((WebSocketChannel channel, String? _) {
         final ip = Zone.current[_remoteIpKey] as String? ?? 'desconhecido';
         _handleConnection(channel, lobby, matchService, ip);
@@ -84,6 +84,10 @@ void _handleConnection(
           );
           lobby.register(connection);
           connection.send(WelcomeMessage(playerId: playerId!).toJson());
+          // So a freshly connected client's "Partidas iniciadas" container
+          // has something to show immediately, instead of waiting for the
+          // next match to start or end before it sees anything.
+          connection.send(MatchListMessage(matches: matchService.listActiveMatches()).toJson());
           return;
         }
 
@@ -93,23 +97,45 @@ void _handleConnection(
         switch (envelope.type) {
           case MessageType.requestPlayerList:
             lobby.sendPlayerListTo(currentId);
+          case MessageType.requestMatchList:
+            matchService.sendMatchListTo(lobby, currentId);
           case MessageType.inviteRequest:
             matchService.handleInviteRequest(lobby, currentId, envelope.body);
+            // Marks both the inviter and the invitee pending in everyone
+            // else's roster; there's no membership change to piggyback this
+            // broadcast on, so it has to be triggered explicitly.
+            lobby.refreshPresence();
           case MessageType.inviteResponse:
             matchService.handleInviteResponse(lobby, currentId, envelope.body);
+            lobby.refreshPresence();
+            _broadcastMatchList(lobby, matchService);
           case MessageType.paddleState:
           case MessageType.ballState:
           case MessageType.scoreUpdate:
-          case MessageType.matchEnd:
             matchService.relay(currentId, envelope.body);
+          case MessageType.matchEnd:
+            matchService.handleMatchEnd(currentId, envelope.body);
+            _broadcastMatchList(lobby, matchService);
           case MessageType.leaveMatch:
             final connection = matchService.leaveMatch(currentId);
             if (connection != null) lobby.register(connection);
+            _broadcastMatchList(lobby, matchService);
+          case MessageType.spectateRequest:
+            matchService.handleSpectateRequest(lobby, currentId, envelope.body);
+            _broadcastMatchList(lobby, matchService);
+          case MessageType.leaveSpectate:
+            matchService.removeSpectator(currentId);
+            _broadcastMatchList(lobby, matchService);
           case MessageType.hello:
           case MessageType.welcome:
           case MessageType.playerList:
           case MessageType.matchStart:
           case MessageType.opponentDisconnected:
+          case MessageType.matchList:
+          case MessageType.spectateSnapshot:
+          case MessageType.spectateError:
+          case MessageType.spectatorCount:
+          case MessageType.matchEnded:
             // Server-only outbound message types; ignore if a client sends one.
             break;
         }
@@ -126,6 +152,15 @@ void _handleConnection(
 void _handleDisconnect(String? playerId, Lobby lobby, MatchService matchService) {
   if (playerId == null) return;
   matchService.handleDisconnect(playerId);
+  matchService.removeSpectator(playerId);
   matchService.cancelPendingInvitesFor(lobby, playerId);
   lobby.remove(playerId);
+  _broadcastMatchList(lobby, matchService);
+}
+
+void _broadcastMatchList(Lobby lobby, MatchService matchService) {
+  final message = MatchListMessage(matches: matchService.listActiveMatches()).toJson();
+  for (final player in lobby.all) {
+    player.send(message);
+  }
 }

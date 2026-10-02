@@ -20,6 +20,7 @@ class GameState {
     this.remainingSeconds = kMatchDurationSeconds,
     this.matchOver = false,
     this.opponentLeft = false,
+    this.spectatorCount = 0,
   });
 
   final double ballX;
@@ -52,6 +53,11 @@ class GameState {
   /// (or they intentionally left) before the match timer ran out.
   final bool opponentLeft;
 
+  /// How many people are currently spectating this match. Server sourced —
+  /// see SpectatorCountMessage — so both players (and every spectator) always
+  /// agree on the same number.
+  final int spectatorCount;
+
   GameState copyWith({
     double? ballX,
     double? ballY,
@@ -67,6 +73,7 @@ class GameState {
     int? remainingSeconds,
     bool? matchOver,
     bool? opponentLeft,
+    int? spectatorCount,
   }) {
     return GameState(
       ballX: ballX ?? this.ballX,
@@ -85,6 +92,7 @@ class GameState {
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       matchOver: matchOver ?? this.matchOver,
       opponentLeft: opponentLeft ?? this.opponentLeft,
+      spectatorCount: spectatorCount ?? this.spectatorCount,
     );
   }
 }

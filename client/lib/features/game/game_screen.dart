@@ -13,11 +13,27 @@ import 'widgets/paddle_widget.dart';
 
 /// Renders a [GameState] and wires the control buttons to [onDirectionChanged]
 /// — shared by the standalone practice screen and the real networked match.
+/// With [readOnly] (spectators), the control section is replaced by a plain
+/// label instead of hold-to-move buttons — see SpectatorScreen, and the
+/// server side validation in MatchService.handleSpectateRequest, which is
+/// what actually keeps a spectator from affecting the match: hiding the
+/// buttons here is only a convenience for an honest client, not the thing
+/// that enforces read-only access.
 class GameView extends StatelessWidget {
-  const GameView({super.key, required this.state, required this.onDirectionChanged});
+  const GameView({
+    super.key,
+    required this.state,
+    required this.onDirectionChanged,
+    this.readOnly = false,
+    this.topLabel = 'ADVERSÁRIO',
+    this.bottomLabel = 'VOCÊ',
+  });
 
   final GameState state;
   final ValueChanged<MoveDirection?> onDirectionChanged;
+  final bool readOnly;
+  final String topLabel;
+  final String bottomLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +41,21 @@ class GameView extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            Expanded(flex: 4, child: _FieldSection(state: state)),
+            Expanded(
+              flex: 4,
+              child: _FieldSection(state: state, topLabel: topLabel, bottomLabel: bottomLabel),
+            ),
             Expanded(
               flex: 1,
-              child: ControlButtons(onDirectionChanged: onDirectionChanged),
+              child: readOnly
+                  ? const Center(
+                      child: Text(
+                        'Modo espectador: acompanhando a partida em tempo real.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    )
+                  : ControlButtons(onDirectionChanged: onDirectionChanged),
             ),
           ],
         ),
@@ -67,9 +94,11 @@ class NetworkGameScreen extends ConsumerWidget {
 }
 
 class _FieldSection extends StatelessWidget {
-  const _FieldSection({required this.state});
+  const _FieldSection({required this.state, required this.topLabel, required this.bottomLabel});
 
   final GameState state;
+  final String topLabel;
+  final String bottomLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +108,12 @@ class _FieldSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-            child: _ScoreTimerRow(state: state),
+            child: Column(
+              children: [
+                _ScoreTimerRow(state: state, topLabel: topLabel, bottomLabel: bottomLabel),
+                _SpectatorIndicator(count: state.spectatorCount),
+              ],
+            ),
           ),
           // The play field gets its own space below the score/timer boxes,
           // so the opponent paddle can never render underneath them.
@@ -146,9 +180,11 @@ Widget _fieldPositioned({
 }
 
 class _ScoreTimerRow extends StatelessWidget {
-  const _ScoreTimerRow({required this.state});
+  const _ScoreTimerRow({required this.state, required this.topLabel, required this.bottomLabel});
 
   final GameState state;
+  final String topLabel;
+  final String bottomLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -157,10 +193,42 @@ class _ScoreTimerRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _StatBox(label: 'ADVERSÁRIO', value: '${state.scoreTop}'),
+        _StatBox(label: topLabel, value: '${state.scoreTop}'),
         _StatBox(label: 'TEMPO', value: '$minutes:$seconds'),
-        _StatBox(label: 'VOCÊ', value: '${state.scoreBottom}'),
+        _StatBox(label: bottomLabel, value: '${state.scoreBottom}'),
       ],
+    );
+  }
+}
+
+/// Eye icon + spectator count, shown right below the score/timer boxes.
+/// Collapses to nothing (zero height, not just invisible) when nobody is
+/// watching, so an empty count never reserves blank space in the layout —
+/// and since it's appended below the score/timer row rather than inserted
+/// between its elements, those never shift when this appears or disappears.
+class _SpectatorIndicator extends StatelessWidget {
+  const _SpectatorIndicator({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Semantics(
+        label: '$count ${count == 1 ? 'espectador assistindo' : 'espectadores assistindo'}',
+        child: ExcludeSemantics(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.visibility, size: 16, color: Colors.white70),
+              const SizedBox(width: 4),
+              Text('$count', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
