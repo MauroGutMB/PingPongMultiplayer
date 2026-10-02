@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pingpong-server
+    runtime: docker
+    repo: https://github.com/MauroGutMB/PingPongMultiplayer
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    # No healthCheckPath: this server only answers WebSocket upgrades (shelf_web_socket
+    # 404s any plain GET, including "/"), so an HTTP health check would always fail.
+    # Render falls back to checking that the port is listening.
+    envVars:
+      - key: PORT
+        value: 8080
