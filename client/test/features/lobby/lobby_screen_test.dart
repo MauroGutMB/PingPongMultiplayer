@@ -109,7 +109,7 @@ void main() {
 
     await tester.tap(find.text('Bob'));
     await _pump(tester);
-    expect(find.text('Convidar Bob para uma partida?'), findsOneWidget);
+    expect(find.text('Convidar Bob para uma partida'), findsOneWidget);
 
     await tester.tap(find.text('Convidar'));
     // A single pump, not pumpAndSettle: the waiting dialog shows an
@@ -117,7 +117,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(transport.sent.last, {'type': 'invite_request', 'toId': 'bob'});
+    expect(transport.sent.last, {
+      'type': 'invite_request',
+      'toId': 'bob',
+      'config': {'ballSpeedMultiplier': 1.0, 'winningScore': 0, 'durationSeconds': 120},
+    });
     expect(find.text('Aguardando resposta de Bob...'), findsOneWidget);
 
     transport.receive({
@@ -213,7 +217,10 @@ void main() {
     });
     await _pump(tester);
 
-    expect(find.text('Carol te convidou para uma partida.'), findsOneWidget);
+    expect(
+      find.text('Carol te convidou para uma partida.\nBola Normal, sem limite de pontos, 2 min.'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Aceitar'));
     await _pump(tester);
@@ -244,7 +251,9 @@ void main() {
         'fromNickname': 'Carol',
       });
       await _pump(tester);
-      expect(find.text('Carol te convidou para uma partida.'), findsOneWidget);
+      const inviteText =
+          'Carol te convidou para uma partida.\nBola Normal, sem limite de pontos, 2 min.';
+      expect(find.text(inviteText), findsOneWidget);
 
       await tester.tap(find.text('Recusar'));
       await _pump(tester);
@@ -256,7 +265,7 @@ void main() {
       });
       // The popup is gone and the ordinary lobby is back — no leftover
       // barrier, no stuck black overlay, nothing else covering the screen.
-      expect(find.text('Carol te convidou para uma partida.'), findsNothing);
+      expect(find.text(inviteText), findsNothing);
       expect(find.byType(Dialog), findsNothing);
       expect(find.text('Bob'), findsOneWidget);
 
@@ -264,7 +273,88 @@ void main() {
       // player still works normally.
       await tester.tap(find.text('Bob'));
       await _pump(tester);
-      expect(find.text('Convidar Bob para uma partida?'), findsOneWidget);
+      expect(find.text('Convidar Bob para uma partida'), findsOneWidget);
     },
   );
+
+  testWidgets('refresh button sends both list requests and disables while in flight', (
+    tester,
+  ) async {
+    final transport = FakeLobbyTransport();
+    await _enterLobby(tester, transport);
+    transport.sent.clear();
+
+    final refreshButtonFinder = find.widgetWithIcon(IconButton, Icons.refresh);
+    await tester.tap(refreshButtonFinder);
+    await tester.pump();
+
+    expect(transport.sent, [
+      {'type': 'request_player_list'},
+      {'type': 'request_match_list'},
+    ]);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    transport.receive({'type': 'player_list', 'players': []});
+    transport.receive({'type': 'match_list', 'matches': []});
+    await _pump(tester);
+
+    expect(find.byIcon(Icons.refresh), findsOneWidget);
+    expect(tester.widget<IconButton>(refreshButtonFinder).onPressed, isNotNull);
+  });
+
+  testWidgets('a player with a pending invite is shown disabled with a reason', (
+    tester,
+  ) async {
+    final transport = FakeLobbyTransport();
+    await _enterLobby(
+      tester,
+      transport,
+      players: [
+        {'id': 'bob', 'nickname': 'Bob', 'ip': '10.0.0.2', 'pendingInvite': true},
+      ],
+    );
+
+    expect(find.text('Convite pendente'), findsOneWidget);
+    await tester.tap(find.text('Bob'));
+    await _pump(tester);
+    // Disabled: tapping it never opens the invite confirmation dialog.
+    expect(find.text('Convidar Bob para uma partida'), findsNothing);
+  });
+
+  testWidgets('lists in-progress matches and spectating sends a spectate_request', (
+    tester,
+  ) async {
+    final transport = FakeLobbyTransport();
+    await _enterLobby(tester, transport);
+
+    transport.receive({
+      'type': 'match_list',
+      'matches': [
+        {
+          'matchId': 'm1',
+          'bottomId': 'bob',
+          'bottomNickname': 'Bob',
+          'topId': 'carol',
+          'topNickname': 'Carol',
+          'spectatorCount': 2,
+        },
+      ],
+    });
+    await _pump(tester);
+
+    expect(find.text('Bob x Carol'), findsOneWidget);
+    expect(find.text('2 espectadores'), findsOneWidget);
+
+    await tester.tap(find.text('Bob x Carol'));
+    await _pump(tester);
+
+    expect(transport.sent.last, {'type': 'spectate_request', 'matchId': 'm1'});
+  });
+
+  testWidgets('an empty match list shows a friendly message', (tester) async {
+    final transport = FakeLobbyTransport();
+    await _enterLobby(tester, transport);
+
+    expect(find.text('Nenhuma partida em andamento no momento.'), findsOneWidget);
+  });
 }

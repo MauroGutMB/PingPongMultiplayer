@@ -156,6 +156,54 @@ void main() {
     expect(next.scoreTop, 0);
   });
 
+  test('reaching the configured winning score ends the match instead of re-serving', () {
+    final state = GameState(
+      ballX: 0.5,
+      ballY: 0.93,
+      ballVX: 0.0,
+      ballVY: 1.0,
+      playerPaddleX: 0.9,
+      scoreTop: 4,
+    );
+
+    final next = advanceGame(state, 0.05, random: random, winningScore: 5);
+
+    expect(next.scoreTop, 5);
+    expect(next.matchOver, isTrue);
+    // No re-serve: the ball stays wherever it was at the moment of the miss.
+    expect(next.ballY, isNot(0.5));
+  });
+
+  test('a winning score below the current score keeps playing (0 disables it)', () {
+    final state = GameState(
+      ballX: 0.5,
+      ballY: 0.93,
+      ballVX: 0.0,
+      ballVY: 1.0,
+      playerPaddleX: 0.9,
+    );
+
+    final next = advanceGame(state, 0.05, random: random);
+
+    expect(next.scoreTop, 1);
+    expect(next.matchOver, isFalse);
+    expect(next.ballY, 0.5); // re-served as usual
+  });
+
+  test('ballSpeedMultiplier scales the serve launched after a point', () {
+    final state = GameState(
+      ballX: 0.5,
+      ballY: 0.93,
+      ballVX: 0.0,
+      ballVY: 1.0,
+      playerPaddleX: 0.9,
+    );
+
+    final next = advanceGame(state, 0.05, random: random, ballSpeedMultiplier: 2.0);
+
+    expect(next.ballVY.abs(), closeTo(0.55 * 2.0, 1e-9));
+  });
+
   test('advanceGame is a no-op once the match is over', () {
     const state = GameState(matchOver: true, ballX: 0.3);
 

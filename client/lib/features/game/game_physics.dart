@@ -5,15 +5,18 @@ import 'game_state.dart';
 import 'widgets/control_buttons.dart' show MoveDirection;
 
 /// Re-centers the ball and launches it in a random direction. Used both for
-/// the opening serve and after every point.
-GameState resetBall(GameState state, Random random) {
+/// the opening serve and after every point. [speedMultiplier] comes from the
+/// match's configured ball speed (see MatchConfig) — 1.0 for the local
+/// practice screen, which has no invite and so no configuration at all.
+GameState resetBall(GameState state, Random random, {double speedMultiplier = 1.0}) {
   final horizontal = random.nextDouble() * 0.6 - 0.3;
   final goingDown = random.nextBool();
+  final speed = kInitialBallSpeed * speedMultiplier;
   return state.copyWith(
     ballX: 0.5,
     ballY: 0.5,
-    ballVX: kInitialBallSpeed * horizontal,
-    ballVY: kInitialBallSpeed * (goingDown ? 1 : -1),
+    ballVX: speed * horizontal,
+    ballVY: speed * (goingDown ? 1 : -1),
     // Keep the dead-reckoning target in sync with the real position — see
     // the note in advanceGame's authoritative branch for why this matters.
     ballTargetX: 0.5,
@@ -28,15 +31,13 @@ GameState resetBall(GameState state, Random random) {
   required double vx,
   required double vy,
   required double paddleVelocity,
+  required double maxSpeed,
 }) {
   final bouncedVy = -vy;
   if (paddleVelocity == 0) {
     return (vx: vx * kStationaryHitDamping, vy: bouncedVy * kStationaryHitDamping);
   }
-  final pushedVx = (vx + paddleVelocity * kPaddleSpinFactor).clamp(
-    -kMaxBallSpeed,
-    kMaxBallSpeed,
-  );
+  final pushedVx = (vx + paddleVelocity * kPaddleSpinFactor).clamp(-maxSpeed, maxSpeed);
   return (vx: pushedVx, vy: bouncedVy);
 }
 
@@ -75,8 +76,11 @@ GameState advanceGame(
   required Random random,
   bool restrictToOwnHalf = false,
   bool authoritativeAtCenter = true,
+  double ballSpeedMultiplier = 1.0,
+  int winningScore = 0,
 }) {
   if (state.matchOver || dt <= 0) return state;
+  final maxSpeed = kMaxBallSpeed * ballSpeedMultiplier;
 
   final smoothing = _smoothingFactor(dt);
   state = state.copyWith(
@@ -127,26 +131,42 @@ GameState advanceGame(
   if (vy < 0 && ballY <= kPaddleBandOffset) {
     if ((ballX - state.opponentPaddleX).abs() <= halfPaddle) {
       ballY = kPaddleBandOffset;
-      final bounce = _bounce(vx: vx, vy: vy, paddleVelocity: opponentVelocity);
+      final bounce = _bounce(
+        vx: vx,
+        vy: vy,
+        paddleVelocity: opponentVelocity,
+        maxSpeed: maxSpeed,
+      );
       vx = bounce.vx;
       vy = bounce.vy;
     } else {
-      return resetBall(
-        state.copyWith(playerPaddleX: playerX, scoreBottom: state.scoreBottom + 1),
-        random,
-      );
+      final scored = state.copyWith(playerPaddleX: playerX, scoreBottom: state.scoreBottom + 1);
+      // A configured winning score (see MatchConfig) ends the match the
+      // instant it's reached, instead of re-serving and playing on until the
+      // clock runs out — 0 keeps the original time-only behavior, so the
+      // local practice screen (which never sets this) is unaffected.
+      if (winningScore > 0 && scored.scoreBottom >= winningScore) {
+        return scored.copyWith(matchOver: true);
+      }
+      return resetBall(scored, random, speedMultiplier: ballSpeedMultiplier);
     }
   } else if (vy > 0 && ballY >= 1 - kPaddleBandOffset) {
     if ((ballX - playerX).abs() <= halfPaddle) {
       ballY = 1 - kPaddleBandOffset;
-      final bounce = _bounce(vx: vx, vy: vy, paddleVelocity: playerVelocity);
+      final bounce = _bounce(
+        vx: vx,
+        vy: vy,
+        paddleVelocity: playerVelocity,
+        maxSpeed: maxSpeed,
+      );
       vx = bounce.vx;
       vy = bounce.vy;
     } else {
-      return resetBall(
-        state.copyWith(playerPaddleX: playerX, scoreTop: state.scoreTop + 1),
-        random,
-      );
+      final scored = state.copyWith(playerPaddleX: playerX, scoreTop: state.scoreTop + 1);
+      if (winningScore > 0 && scored.scoreTop >= winningScore) {
+        return scored.copyWith(matchOver: true);
+      }
+      return resetBall(scored, random, speedMultiplier: ballSpeedMultiplier);
     }
   }
 

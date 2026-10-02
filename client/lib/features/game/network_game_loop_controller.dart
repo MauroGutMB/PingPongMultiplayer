@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/protocol.dart' show MatchConfig;
 import '../lobby/lobby_provider.dart';
 import 'game_physics.dart';
 import 'game_state.dart';
@@ -43,10 +44,25 @@ class NetworkGameLoopController extends Notifier<GameState> {
   // "top" starts frozen and waits for bottom's first serve to arrive.
   bool _authoritativeAtCenter = true;
 
+  /// Our own side ("bottom" or "top"), kept around (beyond
+  /// [_authoritativeAtCenter]) to translate our egocentric scoreTop/
+  /// scoreBottom into the absolute, side-labelled numbers sent over the wire
+  /// — see [_neutralScoreBottom]/[_neutralScoreTop].
+  String _side = 'bottom';
+
+  /// Ball speed, winning score and duration the inviter picked — identical on
+  /// both sides, since the server only ever hands out the inviter's own
+  /// (sanitized) choice. Defaults to the original time-only, normal-speed
+  /// behavior if this controller is ever built with no matchStart yet.
+  MatchConfig _config = const MatchConfig();
+
   @override
   GameState build() {
-    final side = ref.watch(lobbyControllerProvider.select((s) => s.matchStart?.side));
+    final matchStart = ref.watch(lobbyControllerProvider.select((s) => s.matchStart));
+    final side = matchStart?.side;
+    _side = side ?? 'bottom';
     _authoritativeAtCenter = side != 'top';
+    _config = matchStart?.config ?? const MatchConfig();
 
     final transport = ref.watch(lobbyTransportProvider);
     ref.onDispose(_disposeLoop);
@@ -58,16 +74,18 @@ class NetworkGameLoopController extends Notifier<GameState> {
             state = applyOpponentBall(state, x: x, y: y, vx: vx, vy: vy),
         onOpponentScored: () => state = applyOpponentScored(state),
         onOpponentDisconnected: _onOpponentDisconnected,
+        onSpectatorCount: (count) =>
+            state = state.copyWith(spectatorCount: count),
       );
 
     _lastElapsed = Duration.zero;
     _ticker = Ticker(_onTick)..start();
     _matchTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tickClock());
 
-    const initial = GameState();
+    final initial = const GameState().copyWith(remainingSeconds: _config.durationSeconds);
     if (!_authoritativeAtCenter) return initial;
 
-    final serve = resetBall(initial, _random);
+    final serve = resetBall(initial, _random, speedMultiplier: _config.ballSpeedMultiplier);
     // Broadcast the opening serve unconditionally, right now — not on the
     // next tick. If the random direction happens to head straight for the
     // opponent's half, the very first tick's own send-check would already
@@ -93,12 +111,27 @@ class NetworkGameLoopController extends Notifier<GameState> {
     _ticker?.stop();
   }
 
+  /// Our egocentric scoreTop/scoreBottom ("mine"/"theirs") translated into
+  /// absolute, side-labelled numbers: on "bottom" they already line up
+  /// (scoreBottom is bottom's own score), but on "top" our own fields are the
+  /// mirror image of the match's real bottom/top tally.
+  int get _neutralScoreBottom => _side == 'top' ? state.scoreTop : state.scoreBottom;
+  int get _neutralScoreTop => _side == 'top' ? state.scoreBottom : state.scoreTop;
+
   void _tickClock() {
     if (state.matchOver) return;
     final remaining = state.remainingSeconds - 1;
     if (remaining <= 0) {
       state = state.copyWith(remainingSeconds: 0, matchOver: true);
       _ticker?.stop();
+      // Reports the natural timeout so the server can notify any spectators
+      // and drop this match from the lobby's "Partidas iniciadas" list. Both
+      // players report it independently (each runs its own local clock);
+      // the server tolerates the second, redundant report as a no-op.
+      _sync?.sendMatchEnd(
+        scoreBottom: _neutralScoreBottom,
+        scoreTop: _neutralScoreTop,
+      );
     } else {
       state = state.copyWith(remainingSeconds: remaining);
     }
@@ -123,7 +156,19 @@ class NetworkGameLoopController extends Notifier<GameState> {
       random: _random,
       restrictToOwnHalf: true,
       authoritativeAtCenter: _authoritativeAtCenter,
+      ballSpeedMultiplier: _config.ballSpeedMultiplier,
+      winningScore: _config.winningScore,
     );
+
+    if (state.matchOver) {
+      // Reached the configured winning score just now (the timer's own
+      // matchOver path is handled separately, in _tickClock) — report it and
+      // stop, the same way a natural timeout does, so the server can notify
+      // any spectators and drop this match from the lobby's list.
+      _ticker?.stop();
+      _sync?.sendMatchEnd(scoreBottom: _neutralScoreBottom, scoreTop: _neutralScoreTop);
+      return;
+    }
 
     _sincePaddleBroadcast += dtDuration;
     if (_sincePaddleBroadcast >= _paddleBroadcastInterval) {
@@ -155,7 +200,10 @@ class NetworkGameLoopController extends Notifier<GameState> {
       _sync?.sendBall(state.ballX, state.ballY, state.ballVX, state.ballVY);
     }
     if (scoredJustNow) {
-      _sync?.sendScoreUpdate();
+      _sync?.sendScoreUpdate(
+        scoreBottom: _neutralScoreBottom,
+        scoreTop: _neutralScoreTop,
+      );
     }
   }
 
