@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: pingpong-server
+    name: pingpong-server-b567
     runtime: docker
     repo: https://github.com/MauroGutMB/PingPongMultiplayer
     rootDir: server
